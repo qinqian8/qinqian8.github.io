@@ -133,6 +133,12 @@
     </style>
 </head>
 <body>
+    <div id="lock-screen" style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f0f0f0; z-index:999999; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif;">
+    <h2 style="margin-bottom:20px;">内容已加密</h2>
+    <input type="password" id="pass-input" placeholder="输入访问密码" style="padding:10px; border-radius:5px; border:1px solid #ccc;">
+    <button onclick="checkPass()" style="margin-top:15px; padding:10px 20px; background:#007bff; color:white; border:none; border-radius:5px; cursor:pointer;">进入网站</button>
+</div>
+
 
     <nav>
         <div class="logo">MyBrand</div>
@@ -184,6 +190,18 @@ function googleTranslateElementInit() {
     <script>
         // 可以在这里添加一些简单的交互
         console.log("网站已加载完毕！");
+
+        function checkPass() {
+    const pass = document.getElementById('pass-input').value;
+    const correctPass = "123456"; // 这里设置你的密码
+    
+    if (pass === correctPass) {
+        document.getElementById('lock-screen').style.display = 'none';
+    } else {
+        alert("密码不正确！");
+    }
+}
+
     </script>
 
 </body>
