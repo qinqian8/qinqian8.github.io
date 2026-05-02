@@ -144,8 +144,8 @@
     </nav>
 
     <header class="hero">
-        <h1>用代码构建你的梦想</h1>
-        <p>没什么实际意义的网站</p>
+        <h1 data-key = "title">用代码构建你的梦想</h1>
+        <p data_key = "desc">没什么实际意义的网站</p>
         <a href="#features" class="btn">了解更多</a>
     </header>
 
@@ -174,5 +174,41 @@
         // 可以在这里添加一些简单的交互
         console.log("网站已加载完毕！");
     </script>
+    const langBtn = document.getElementById('lang-btn');
+let currentLang = localStorage.getItem('lang') || 'zh'; // 读取本地存储，默认中文
+
+// 1. 定义翻译字典
+const translations = {
+    'zh': {
+        'title': '欢迎来到我的 Godot 游戏主页',
+        'desc': '这是一个从零开始制作的小游戏。',
+        'btn': '切换为英文'
+    },
+    'en': {
+        'title': 'Welcome to my Godot Game Page',
+        'desc': 'This is a small game built from scratch.',
+        'btn': 'Switch to Chinese'
+    }
+};
+
+// 2. 渲染页面的函数
+function render() {
+    document.querySelectorAll('[data-key]').forEach(element => {
+        const key = element.getAttribute('data-key');
+        element.textContent = translations[currentLang][key];
+    });
+    langBtn.textContent = translations[currentLang]['btn'];
+}
+
+// 3. 按钮点击事件
+langBtn.addEventListener('click', () => {
+    currentLang = currentLang === 'zh' ? 'en' : 'zh'; // 切换语言状态
+    localStorage.setItem('lang', currentLang);       // 记住用户的选择
+    render();
+});
+
+// 初始化页面
+render();
+
 </body>
 </html>
