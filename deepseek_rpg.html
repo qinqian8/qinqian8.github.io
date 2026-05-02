@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>🌍 精灵纪元 | 像素RPG冒险</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a1428, #07101f);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'Segoe UI', monospace;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .game-wrapper {
+            background: #1e293bb3;
+            border-radius: 48px;
+            padding: 20px;
+            backdrop-filter: blur(3px);
+            box-shadow: 0 25px 40px rgba(0,0,0,0.5);
+        }
+
+        .rpg-container {
+            background: #0f172a;
+            border-radius: 32px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            padding: 20px;
+            border: 1px solid #6b4e71;
+        }
+
+        /* 地图画板区域 */
+        .map-area {
+            background: #020617;
+            border-radius: 24px;
+            padding: 12px;
+            box-shadow: inset 0 0 20px #00000066, 0 10px 20px black;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 20px;
+            cursor: pointer;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+
+        #worldCanvas {
+            box-shadow: 0 0 0 3px #a78bfa;
+        }
+
+        .info-panel {
+            background: #0b1120cc;
+            backdrop-filter: blur(12px);
+            border-radius: 28px;
+            padding: 18px;
+            min-width: 240px;
+            border: 1px solid #8570a5;
+        }
+
+        .hero-card {
+            background: #1e1b2e;
+            border-radius: 32px;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .hero-name {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #fed7aa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .stat-bars {
+            margin: 12px 0;
+        }
+
+        .bar-label {
+            font-size: 0.8rem;
+            color: #b9c3e6;
+        }
+
+        .hp-bar-bg, .exp-bar-bg {
+            background: #341f2c;
+            border-radius: 20px;
+            height: 12px;
+            overflow: hidden;
+            margin: 4px 0 10px;
+        }
+
+        .hp-fill { background: #e65c5c; width: 100%; height: 100%; transition: width 0.2s; }
+        .exp-fill { background: #6bcb77; width: 0%; height: 100%; transition: width 0.2s; }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #e0d7ff;
+            margin: 6px 0;
+        }
+
+        .combat-log {
+            background: #03070f;
+            border-radius: 24px;
+            padding: 12px;
+            height: 180px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 15px 0;
+            border: 1px solid #5a4a6e;
+        }
+
+        .log-line {
+            border-left: 3px solid #facc15;
+            padding-left: 8px;
+            margin: 6px 0;
+            color: #cfecf0;
+        }
+
+        button {
+            background: linear-gradient(180deg, #3c2c4f, #221b38);
+            border: none;
+            color: #ffefc0;
+            font-weight: bold;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-family: monospace;
+            cursor: pointer;
+            transition: 0.05s linear;
+            box-shadow: 0 4px 0 #0a0712;
+            margin: 5px 0;
+        }
+        button:active { transform: translateY(2px); box-shadow: 0 1px 0 #0a0712; }
+        .attack-btn { background: linear-gradient(180deg, #9e4244, #6e2e2e); }
+        .heal-btn { background: linear-gradient(180deg, #2e7d64, #1b553f); }
+        .action-group { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+
+        .badge-loc {
+            background: #000000aa;
+            border-radius: 20px;
+            padding: 4px 12px;
+            text-align: center;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="game-wrapper">
+    <div class="rpg-container">
+        <!-- 地图区域 -->
+        <div class="map-area">
+            <canvas id="worldCanvas" width="480" height="480"></canvas>
+            <div class="badge-loc" style="margin-top:8px; display: flex; justify-content: space-between;">
+                <span>📍 当前区域: <span id="currentZone">翠绿草地</span></span>
+                <span>🌀 方向键 / WASD 移动</span>
+            </div>
+        </div>
+
+        <!-- 右侧面板 -->
+        <div class="info-panel">
+            <div class="hero-card">
+                <div class="hero-name">
+                    🧝 <span id="heroName">风之游侠</span> 🗡️
+                    <span style="font-size:1rem;">Lv.<span id="heroLv">1</span></span>
+                </div>
+                <div class="stat-bars">
+                    <div class="bar-label">❤️ 生命值</div>
+                    <div class="hp-bar-bg"><div class="hp-fill" id="hpFill" style="width: 100%"></div></div>
+                    <div class="stats-row"><span>⚔️ 攻击力 <span id="atkStat">22</span></span><span>🛡️ 防御 <span id="defStat">10</span></span></div>
+                    <div class="bar-label">✨ 经验值</div>
+                    <div class="exp-bar-bg"><div class="exp-fill" id="expFill" style="width: 0%"></div></div>
+                    <div class="stats-row"><span>💀 击败敌人 <span id="killCount">0</span></span><span>🌟 下一级 <span id="nextExp">100</span></span></div>
+                </div>
+            </div>
+
+            <div class="combat-log" id="logPanel">
+                <div class="log-line">🌄 欢迎来到精灵大陆，勇者！</div>
+                <div class="log-line">🗺️ 使用键盘移动角色，触碰怪物/精灵触发战斗。</div>
+                <div class="log-line">⚡ 击败魔物可获得经验与灵魂之力。</div>
+            </div>
+
+            <div class="action-group">
+                <button id="attackBtn" class="attack-btn">⚡ 攻击(战斗时)</button>
+                <button id="healBtn" class="heal-btn">🍃 自然治愈</button>
+                <button id="resetBtn">🔄 重历征程</button>
+            </div>
+            <div style="font-size:10px; margin-top:8px; text-align:center; color:#af9fcf;">※ 地图上遇到红色怪物即可进入战斗 ※</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- RPG 世界配置 ----------
+        const MAP_SIZE = 12;      // 12x12 网格
+        const CELL_SIZE = 40;     // 480/12
+        
+        let canvas = document.getElementById('worldCanvas');
+        let ctx = canvas.getContext('2d');
+        
+        // 地图图块类型
+        const TILE = {
+            GRASS: 0,
+            DIRT: 1,
+            WATER: 2,
+            TREE: 3
+        };
+        
+        // 地图矩阵 (背景)
+        let worldMap = Array(MAP_SIZE).fill().map(() => Array(MAP_SIZE).fill(0));
+        // 动态实体: null 或者 怪物/精灵事件
+        let entities = Array(MAP_SIZE).fill().map(() => Array(MAP_SIZE).fill(null));
+        
+        // 精灵对象 (玩家)
+        let player = {
+            x: 6, y: 6,
+            hp: 85,
+            maxHp: 85,
+            baseAtk: 22,
+            baseDef: 10,
+            lv: 1,
+            exp: 0,
+            expToNext: 100,
+            killCount: 0,
+            soulPower: 0   // 增加伤害百分比
+        };
+        
+        let gameOver = false;
+        let inBattle = false;
+        let currentMonster = null;
+        let currentMonsterHp = 0;
+        
+        // UI 元素绑定
+        const heroLvSpan = document.getElementById('heroLv');
+        const hpFillDiv = document.getElementById('hpFill');
+        const atkStatSpan = document.getElementById('atkStat');
+        const defStatSpan = document.getElementById('defStat');
+        const killCountSpan = document.getElementById('killCount');
+        const nextExpSpan = document.getElementById('nextExp');
+        const expFillDiv = document.getElementById('expFill');
+        const currentZoneSpan = document.getElementById('currentZone');
+        const logPanel = document.getElementById('logPanel');
+        
+        // 辅助函数 添加日志
+        function addLog(msg, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'log-line';
+            div.style.color = isError ? '#ffb7b2' : '#d6e6ff';
+            div.innerHTML = isError ? `⚠️ ${msg}` : `✦ ${msg}`;
+            logPanel.appendChild(div);
+            logPanel.scrollTop = logPanel.scrollHeight;
+            while (logPanel.children.length > 28) logPanel.removeChild(logPanel.firstChild);
+        }
+        
+        // 更新UI数值
+        function updateHeroUI() {
+            heroLvSpan.innerText = player.lv;
+            let hpPercent = (player.hp / player.maxHp) * 100;
+            hpFillDiv.style.width = `${Math.max(0, hpPercent)}%`;
+            let totalAtk = getTotalAtk();
+            let totalDef = getTotalDef();
+            atkStatSpan.innerText = totalAtk;
+            defStatSpan.innerText = totalDef;
+            killCountSpan.innerText = player.killCount;
+            nextExpSpan.innerText = player.expToNext;
+            let expPercent = (player.exp / player.expToNext) * 100;
+            expFillDiv.style.width = `${expPercent}%`;
+            if (gameOver) {
+                // 显示灰色
+            }
+        }
+        
+        function getTotalAtk() {
+            let lvBonus = Math.floor(player.lv * 2.2);
+            let soulBonus = Math.floor(player.baseAtk * (player.soulPower / 100));
+            return player.baseAtk + lvBonus + soulBonus;
+        }
+        
+        function getTotalDef() {
+            return player.baseDef + Math.floor(player.lv * 1.5);
+        }
+        
+        // 玩家属性同步
+        function syncStats() {
+            updateHeroUI();
+        }
+        
+        // 升级系统
+        function tryLevelUp() {
+            let leveled = false;
+            while (player.exp >= player.expToNext) {
+                player.exp -= player.expToNext;
+                player.lv++;
+                let hpUp = 18 + Math.floor(Math.random() * 15);
+                player.maxHp += hpUp;
+                player.hp = player.maxHp;
+                player.baseAtk += 4;
+                player.baseDef += 2;
+                player.expToNext = Math.floor(player.expToNext * 1.22);
+                if (player.expToNext > 800) player.expToNext = 800;
+                addLog(`🎉 晋升 Lv.${player.lv}！生命上限 +${hpUp}，战技精进！`);
+                leveled = true;
+            }
+            if (leveled) syncStats();
+        }
+        
+        // 获得经验 & 灵魂之力
+        function gainReward(expGain, soulGain) {
+            player.exp += expGain;
+            player.soulPower = Math.min(65, player.soulPower + soulGain);
+            addLog(`✨ 获得 ${expGain} 经验，灵魂之力 +${soulGain}% (总增伤${player.soulPower}%)`);
+            tryLevelUp();
+            syncStats();
+        }
+        
+        // 怪物库 (生动精灵类)
+        const bestiary = [
+            { name: "🌿 草精灵", baseHp: 28, baseAtk: 12, baseDef: 4, exp: 28, soul: 3 },
+            { name: "🔥 焰狼", baseHp: 38, baseAtk: 18, baseDef: 5, exp: 42, soul: 5 },
+            { name: "🍄 魔化菇人", baseHp: 32, baseAtk: 15, baseDef: 6, exp: 36, soul: 4 },
+            { name: "⚡ 雷翼鸟", baseHp: 45, baseAtk: 22, baseDef: 7, exp: 55, soul: 6 },
+            { name: "🧊 霜巨人", baseHp: 60, baseAtk: 25, baseDef: 10, exp: 78, soul: 9 },
+            { name: "🕷️ 黯影蛛后", baseHp: 72, baseAtk: 30, baseDef: 12, exp: 95, soul: 12 }
+        ];
+        
+        function generateMonsterByZone(zoneX, zoneY) {
+            let intensity = Math.min(Math.floor(Math.sqrt(player.lv)) + 1, 5);
+            let raw = bestiary[Math.floor(Math.random() * bestiary.length)];
+            let tierBonus = Math.floor((player.lv / 3) + intensity);
+            let hpFinal = raw.baseHp + tierBonus * 4 + Math.floor(Math.random() * 12);
+            let atkFinal = raw.baseAtk + tierBonus * 2;
+            let defFinal = raw.baseDef + tierBonus;
+            return {
+                name: raw.name,
+                hp: hpFinal,
+                maxHp: hpFinal,
+                atk: atkFinal,
+                def: defFinal,
+                expReward: raw.exp + tierBonus * 5,
+                soulReward: raw.soul + Math.floor(tierBonus / 2) + 1
+            };
+        }
+        
+        // 战斗系统 (简化回合，一键攻击/治疗)
+        function battleAttack() {
+            if (!inBattle || gameOver) {
+                if(!inBattle) addLog("没有战斗中的敌人……", true);
+                return;
+            }
+            let playerAtk = getTotalAtk();
+            let damage = Math.max(5, playerAtk - Math.floor(currentMonster.def * 0.7) + Math.floor(Math.random() * 12));
+            currentMonsterHp -= damage;
+            addLog(`🗡️ 你对 ${currentMonster.name} 造成 ${damage} 伤害！ (剩余 ${Math.max(0, currentMonsterHp)}/${currentMonster.maxHp})`);
+            
+            if (currentMonsterHp <= 0) {
+                // 胜利!
+                player.killCount++;
+                let expGain = currentMonster.expReward;
+                let soulGain = currentMonster.soulReward;
+                gainReward(expGain, soulGain);
+                addLog(`🏆 击败 ${currentMonster.name}！获得 ${expGain} 经验，灵魂之力涌动！`);
+                // 战斗结束 , 清除地图实体
+                if (currentMonsterEntityX !== undefined && currentMonsterEntityY !== undefined) {
+                    entities[currentMonsterEntityY][currentMonsterEntityX] = null;
+                }
+                inBattle = false;
+                currentMonster = null;
+                syncStats();
+                drawMap();
+                return;
+            }
+            
+            // 怪物反击
+            let monsterDamage = Math.max(3, currentMonster.atk - Math.floor(getTotalDef() * 0.65) + Math.floor(Math.random() * 9));
+            player.hp -= monsterDamage;
+            addLog(`💢 ${currentMonster.name} 反击造成 ${monsterDamage} 伤害！ (勇者剩余 ${Math.max(0, player.hp)}/${player.maxHp})`);
+            if (player.hp <= 0) {
+                player.hp = 0;
+                gameOver = true;
+                addLog(`💀 勇者战死沙场... 游戏终结。点击重置继续冒险`, true);
+                inBattle = false;
+                syncStats();
+                drawMap();
+                return;
+            }
+            syncStats();
+            drawMap();
+        }
+        
+        function battleHeal() {
+            if (!inBattle || gameOver) {
+                addLog("现在无法治愈……", true);
+                return;
+            }
+            let healAmount = 20 + Math.floor(player.lv * 3) + Math.floor(Math.random() * 18);
+            player.hp = Math.min(player.maxHp, player.hp + healAmount);
+            addLog(`🍃 使用自然治愈，恢复了 ${healAmount} 生命值！ (${player.hp}/${player.maxHp})`);
+            syncStats();
+            // 怪物反击(治疗回合也会遭到攻击)
+            let monsterDamage = Math.max(4, currentMonster.atk - Math.floor(getTotalDef() * 0.6) + Math.floor(Math.random() * 8));
+            player.hp -= monsterDamage;
+            addLog(`💥 怪物趁隙攻击造成 ${monsterDamage} 伤害！`);
+            if (player.hp <= 0) {
+                player.hp = 0;
+                gameOver = true;
+                addLog(`💀 治疗中断，勇者力竭而亡...`, true);
+                inBattle = false;
+                syncStats();
+                drawMap();
+            }
+            syncStats();
+        }
+        
+        // 当前战斗的怪物地图位置 (用于战斗结束后删除)
+        let currentMonsterEntityX = null, currentMonsterEntityY = null;
+        
+        function startBattle(monsterData, x, y) {
+            if (gameOver || inBattle) return;
+            currentMonster = monsterData;
+            currentMonsterHp = monsterData.hp;
+            inBattle = true;
+            currentMonsterEntityX = x;
+            currentMonsterEntityY = y;
+            addLog(`⚔️ 遭遇 ${monsterData.name}！ 生命 ${monsterData.hp}  攻击力 ${monsterData.atk}`, false);
+        }
+        
+        // 生成随机精灵与怪物 (初始化地图)
+        function populateEntities() {
+            for(let i=0;i<MAP_SIZE;i++) for(let j=0;j<MAP_SIZE;j++) entities[i][j] = null;
+            // 生成12~18个怪物
+            let monsterCount = 12 + Math.floor(Math.random() * 12);
+            for(let m=0; m<monsterCount; m++) {
+                let rx = Math.floor(Math.random() * MAP_SIZE);
+                let ry = Math.floor(Math.random() * MAP_SIZE);
+                if((rx === player.x && ry === player.y)) continue;
+                if(entities[ry][rx] === null) {
+                    let mob = generateMonsterByZone(rx, ry);
+                    entities[ry][rx] = { type: 'monster', data: mob };
+                }
+            }
+            // 增加特殊精灵事件点 (协助)
+            for(let s=0; s<4; s++) {
+                let rx = Math.floor(Math.random() * MAP_SIZE);
+                let ry = Math.floor(Math.random() * MAP_SIZE);
+                if(entities[ry][rx] === null && !(rx===player.x && ry===player.y)) {
+                    entities[ry][rx] = { type: 'spirit', buff: true };
+                }
+            }
+        }
+        
+        // 生成地形 (简单美观)
+        function generateTerrain() {
+            for(let y=0; y<MAP_SIZE; y++){
+                for(let x=0; x<MAP_SIZE; x++){
+                    let noise = (x*3 + y*7) % 11;
+                    if(noise < 2 && (x>1 && y>1 && x<MAP_SIZE-2 && y<MAP_SIZE-2)) worldMap[y][x] = TILE.WATER;
+                    else if(noise > 8) worldMap[y][x] = TILE.TREE;
+                    else if((x===0 || y===0 || x===MAP_SIZE-1 || y===MAP_SIZE-1)) worldMap[y][x] = TILE.DIRT;
+                    else worldMap[y][x] = TILE.GRASS;
+                }
+            }
+            // 设定区域名
+        }
+        
+        // 绘制地图和精灵 (生动的像素风格)
+        function drawMap() {
+            ctx.clearRect(0, 0, 480, 480);
+            for(let row=0; row<MAP_SIZE; row++) {
+                for(let col=0; col<MAP_SIZE; col++) {
+                    let tile = worldMap[row][col];
+                    let xPos = col*CELL_SIZE, yPos = row*CELL_SIZE;
+                    if(tile === TILE.GRASS) ctx.fillStyle = '#3c9e3c';
+                    else if(tile === TILE.DIRT) ctx.fillStyle = '#b87c4f';
+                    else if(tile === TILE.WATER) ctx.fillStyle = '#4682b4';
+                    else ctx.fillStyle = '#2c5a2c';
+                    ctx.fillRect(xPos, yPos, CELL_SIZE-1, CELL_SIZE-1);
+                    // 装饰
+                    if(tile === TILE.WATER) { ctx.fillStyle = '#5d9bcf'; ctx.fillRect(xPos+2, yPos+2, CELL_SIZE-5, CELL_SIZE-5); }
+                    if(tile === TILE.TREE) { ctx.fillStyle = '#266d26'; ctx.fillRect(xPos+8, yPos+5, 8, 25); ctx.fillStyle = '#3f9e3f'; ctx.beginPath(); ctx.arc(xPos+12, yPos+12, 8,0,Math.PI*2); ctx.fill(); }
+                }
+            }
+            // 绘制实体 (怪物/精灵)
+            for(let row=0; row<MAP_SIZE; row++) {
+                for(let col=0; col<MAP_SIZE; col++) {
+                    let ent = entities[row][col];
+                    if(ent) {
+                        let xP = col*CELL_SIZE, yP = row*CELL_SIZE;
+                        if(ent.type === 'monster') {
+                            ctx.fillStyle = '#c93a3a';
+                            ctx.beginPath(); ctx.arc(xP+20, yP+20, 14, 0, Math.PI*2); ctx.fill();
+                            ctx.fillStyle = '#f4c542';
+                            ctx.font = "bold 24px monospace";
+                            ctx.fillText("👾", xP+10, yP+32);
+                        } else if(ent.type === 'spirit') {
+                            ctx.fillStyle = '#ab8eff';
+                            ctx.beginPath(); ctx.rect(xP+8, yP+8, 24, 24); ctx.fill();
+                            ctx.fillStyle = '#fff2b5';
+                            ctx.font = "22px monospace";
+                            ctx.fillText("✨", xP+12, yP+32);
+                        }
+                    }
+                }
+            }
+            // 绘制玩家 (精灵骑士)
+            let px = player.x*CELL_SIZE, py = player.y*CELL_SIZE;
+            ctx.fillStyle = '#eca869';
+            ctx.shadowBlur = 0;
+            ctx.fillRect(px+6, py+6, 28, 28);
+            ctx.fillStyle = '#2f2e41';
+            ctx.fillRect(px+12, py+12, 16, 16);
+            ctx.fillStyle = '#f9d56e';
+            ctx.font = "bold 22px monospace";
+            ctx.fillText("⚔️", px+12, py+32);
+            ctx.fillStyle = 'white';
+            ctx.font = "bold 12px monospace";
+            ctx.fillText("勇者", px+12, py+18);
+            // 大地图区域文本
+            let zoneNames = ["迷雾森林", "精灵荒野", "碎光沼泽", "风息丘陵"];
+            let zoneIndex = (player.x + player.y) % 4;
+            currentZoneSpan.innerText = zoneNames[zoneIndex];
+        }
+        
+        // 移动逻辑 + 触发事件 (怪物或者精灵)
+        function tryMove(dx, dy) {
+            if(gameOver) { addLog("冒险已经终结，重置游戏吧", true); return false; }
+            if(inBattle) { addLog("战斗中无法移动！", true); return false; }
+            let newX = player.x + dx;
+            let newY = player.y + dy;
+            if(newX < 0 || newX >= MAP_SIZE || newY < 0 || newY >= MAP_SIZE) return false;
+            // 检查实体碰撞 (触发事件)
+            let entity = entities[newY][newX];
+            if(entity) {
+                if(entity.type === 'monster') {
+                    // 进入战斗
+                    let monsterCopy = JSON.parse(JSON.stringify(entity.data));
+                    startBattle(monsterCopy, newX, newY);
+                    drawMap();
+                    return true;
+                } else if(entity.type === 'spirit') {
+                    // 精灵祝福
+                    let healSpirit = 25 + Math.floor(Math.random() * 28);
+                    player.hp = Math.min(player.maxHp, player.hp + healSpirit);
+                    let extraExp = 15 + player.lv * 2;
+                    player.exp += extraExp;
+                    addLog(`🧚 遇见森林精灵！获得 ${healSpirit} 生命恢复 + ${extraExp} 经验。`);
+                    tryLevelUp();
+                    syncStats();
+                    entities[newY][newX] = null;
+                    // 继续移动
+                    player.x = newX; player.y = newY;
+                    drawMap();
+                    return true;
+                }
+            }
+            // 普通移动
+            player.x = newX; player.y = newY;
+            drawMap();
+            return true;
+        }
+        
+        // 重置游戏
+        function resetGame() {
+            gameOver = false;
+            inBattle = false;
+            currentMonster = null;
+            player = {
+                x: 6, y: 6,
+                hp: 85, maxHp: 85, baseAtk: 22, baseDef: 10,
+                lv: 1, exp: 0, expToNext: 100, killCount: 0, soulPower: 0
+            };
+            generateTerrain();
+            populateEntities();
+            // 避免玩家生成位置有怪物
+            if(entities[player.y][player.x] !== null) entities[player.y][player.x] = null;
+            syncStats();
+            drawMap();
+            while(logPanel.firstChild) logPanel.removeChild(logPanel.firstChild);
+            addLog("✨ 时光回朔，英雄再启征程！");
+            addLog("🗺️ 用方向键或WASD移动, 击败怪物累积灵魂之力。");
+        }
+        
+        // 键盘监听
+        window.addEventListener('keydown', (e) => {
+            let key = e.key;
+            if (key === 'ArrowUp' || key === 'w') tryMove(0, -1);
+            else if (key === 'ArrowDown' || key === 's') tryMove(0, 1);
+            else if (key === 'ArrowLeft' || key === 'a') tryMove(-1, 0);
+            else if (key === 'ArrowRight' || key === 'd') tryMove(1, 0);
+            if(!inBattle && !gameOver) drawMap();
+        });
+        
+        document.getElementById('attackBtn').addEventListener('click', () => battleAttack());
+        document.getElementById('healBtn').addEventListener('click', () => battleHeal());
+        document.getElementById('resetBtn').addEventListener('click', () => resetGame());
+        
+        // 初始世界
+        generateTerrain();
+        populateEntities();
+        syncStats();
+        drawMap();
+        addLog("🧝 命运之剑已握，探索精灵大陆，挑战魔物！");
+    })();
+</script>
+</body>
+</html>

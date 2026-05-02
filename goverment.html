@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Zelin 泽林市人民政府门户网站</title>
+    <style>
+        body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; color: #333; background: #f8f9fa; }
+        /* 顶部导航 */
+        header { background: #fff; border-bottom: 3px solid #c00; padding: 15px 10%; display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: bold; color: #c00; letter-spacing: 2px; }
+        nav a { margin-left: 25px; text-decoration: none; color: #444; font-size: 15px; }
+        
+        /* 核心横幅 */
+        .hero { background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url('zelin-bg.jpg') center/cover; height: 350px; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #fff; }
+        .search-bar { margin-top: 20px; width: 500px; display: flex; }
+        .search-bar input { flex: 1; padding: 12px; border: none; border-radius: 4px 0 0 4px; }
+        .search-bar button { padding: 0 25px; background: #c00; color: #fff; border: none; border-radius: 0 4px 4px 0; cursor: pointer; }
+
+        /* 内容板块 */
+        .container { width: 80%; margin: 40px auto; display: grid; grid-template-columns: 2fr 1fr; gap: 30px; }
+        .section-title { border-left: 4px solid #c00; padding-left: 10px; margin-bottom: 20px; font-size: 20px; }
+        .news-list { list-style: none; padding: 0; background: #fff; padding: 20px; border-radius: 4px; }
+        .news-list li { padding: 12px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .news-list li a { text-decoration: none; color: #333; }
+        
+        /* 服务矩阵 */
+        .services { grid-column: span 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 20px; }
+        .service-card { background: #fff; padding: 30px; text-align: center; border-radius: 8px; transition: transform 0.2s; cursor: pointer; }
+        .service-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        footer { background: #333; color: #ccc; padding: 40px 10%; text-align: center; font-size: 13px; line-height: 2; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">ZELIN 泽林政务</div>
+    <nav>
+        <a href="#">首页</a>
+        <a href="#">新闻发布</a>
+        <a href="#">政务公开</a>
+        <a href="#">政务服务</a>
+        <a href="#">互动交流</a>
+    </nav>
+</header>
+
+<section class="hero">
+    <h1>让服务更高效，让生活更美好</h1>
+    <div class="search-bar">
+        <input type="text" placeholder="搜索政策、公文、办事指南...">
+        <button>搜索</button>
+    </div>
+</section>
+
+<div class="container">
+    <!-- 政务要闻 -->
+    <div>
+        <div class="section-title">政务要闻</div>
+        <ul class="news-list">
+            <li><a href="#">泽林市召开年度数字化转型推进大会</a><span>2024-10-20</span></li>
+            <li><a href="#">关于进一步优化营商环境的若干措施通知</a><span>2024-10-18</span></li>
+            <li><a href="#">泽林生态公园二期工程正式向市民开放</a><span>2024-10-15</span></li>
+            <li><a href="#">市长调研基层治理工作：听民声、解民忧</a><span>2024-10-12</span></li>
+        </ul>
+    </div>
+
+    <!-- 通知公告 -->
+    <div>
+        <div class="section-title">通知公告</div>
+        <ul class="news-list">
+            <li><a href="#">2025年重点民生实事征集公告</a></li>
+            <li><a href="#">关于城区部分路段临时交通管制的公告</a></li>
+            <li><a href="#">泽林市事业单位公开招聘工作人员简章</a></li>
+        </ul>
+    </div>
+
+    <!-- 政务服务矩阵 -->
+    <div class="services">
+        <div class="service-card"><strong>个人办事</strong><p>户籍管理、社会保障</p></div>
+        <div class="service-card"><strong>企业办事</strong><p>设立变更、税务办理</p></div>
+        <div class="service-card"><strong>政务公开</strong><p>政府信息、政策解读</p></div>
+        <div class="service-card"><strong>投诉举报</strong><p>市长信箱、在线投诉</p></div>
+    </div>
+</div>
+
+<footer>
+    <p>主办单位：泽林市人民政府办公厅 | 运行管理：泽林市大数据局</p>
+    <p>网站标识码：1234567890 | ICP备00000000号 | 湘公网安备 0000000000000号</p>
+</footer>
+
+</body>
+</html>

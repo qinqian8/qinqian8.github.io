@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>✨ 龙晶传说 · 勇者动画史诗 ✨</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a0c18, #03060f);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'Segoe UI', monospace;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .epic-container {
+            background: #131e24;
+            border-radius: 48px;
+            padding: 20px;
+            box-shadow: 0 35px 50px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 215, 150, 0.2);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 32px;
+            box-shadow: 0 0 0 4px #f3b33d, 0 18px 35px black;
+            cursor: pointer;
+            background: #0b2b1f;
+        }
+
+        .story-panel {
+            background: #030b11cc;
+            backdrop-filter: blur(14px);
+            margin-top: 20px;
+            padding: 12px 24px;
+            border-radius: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            border: 1px solid #efb87e;
+        }
+
+        button {
+            background: linear-gradient(180deg, #5d4835, #3a2c1f);
+            border: none;
+            color: #ffefcf;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 1rem;
+            padding: 8px 26px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.08s linear;
+            box-shadow: 0 5px 0 #1f1811;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #1f1811;
+        }
+
+        .caption {
+            color: #ffeaaf;
+            font-size: 1rem;
+            text-shadow: 0 2px 3px black;
+            background: #0e1920aa;
+            padding: 6px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        @keyframes pulseGlow {
+            0% { text-shadow: 0 0 0 #ffae42; }
+            100% { text-shadow: 0 0 8px #ffae42; }
+        }
+    </style>
+</head>
+<body>
+<div class="epic-container">
+    <canvas id="legendCanvas" width="900" height="520"></canvas>
+    <div class="story-panel">
+        <div class="caption" id="epicText">⚔️ 序章 · 微光升起 ⚔️</div>
+        <button id="restartEpicBtn">🔄 重燃史诗</button>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const canvas = document.getElementById('legendCanvas');
+        const ctx = canvas.getContext('2d');
+        const storyDiv = document.getElementById('epicText');
+
+        // ========== 动画状态机 (完整叙事弧光) ==========
+        let act = 0;         // 0-8 章节
+        let frame = 0;
+        let animInterval = null;
+        
+        // 角色 / 精灵位置
+        let hero = { x: 100, y: 400, facingRight: true };
+        let wolf = { x: 780, y: 410, visible: true };
+        let golem = { x: 850, y: 390, visible: false, hp: 3 };
+        let dragon = { x: 820, y: 280, visible: false, phase: 0 };
+        let crystalGlow = 0;
+        let aura = 0;
+        
+        // 特效粒子库
+        let leaves = [];
+        let dust = [];
+        let sparks = [];
+        let stars = [];
+        let victoryParticles = [];
+        
+        // 战斗特效
+        let slash = { active: false, x: 0, y: 0, timer: 0 };
+        let hitFlash = 0;
+        let screenShake = 0;
+        let dragonFire = { active: false, x: 0, y: 0, timer: 0 };
+        
+        // 场景装饰
+        let clouds = [{x:90,y:50},{x:380,y:70},{x:720,y:45},{x:550,y:30}];
+        let lanterns = [];
+        
+        // ========== 史诗章节 + 对应文本 ==========
+        const chapterTexts = [
+            "🌄 晨风村 · 少年握紧祖传木剑，告别故乡，踏上寻龙之旅。",
+            "🌲 迷雾森林 · 灰狼尾随，勇者不惧，以意志驯服野兽之魂。",
+            "🏔️ 叹息洞穴 · 石像守卫拦路！剑鸣与碎石共舞，勇者获胜！",
+            "💎 神秘祭坛 · 英雄获得“龙晶碎片”，光芒照耀黑暗深渊。",
+            "🔥 火焰山脉 · 远古巨龙苏醒！天穹燃烧，最终对决开始。",
+            "⚡ 龙息之下，勇者掷出龙晶，光芒贯穿天地——巨龙折翼。",
+            "🏆 黎明时分 · 英雄携龙晶凯旋，村庄举火为歌。",
+            "⭐ 英雄立于塔顶，远方新的大陆在云海中浮现……未完待续。",
+            "✨ 传说永存 · 冒险之心永不熄灭 ✨"
+        ];
+        
+        // 辅助函数: 添加特效
+        function addLeafBurst(x,y) {
+            for(let i=0;i<14;i++) leaves.push({x:x+ (Math.random()-0.5)*50, y:y+(Math.random()-0.5)*30, vx:(Math.random()-0.5)*1.8, vy:-Math.random()*3-1, life:1, size:3+Math.random()*6});
+        }
+        function addDustBurst(x,y) {
+            for(let i=0;i<12;i++) dust.push({x:x+(Math.random()-0.5)*30, y:y+(Math.random()-0.5)*20, vx:(Math.random()-0.5)*2.2, vy:(Math.random()-0.5)*2-1.2, life:0.9, size:2+Math.random()*5});
+        }
+        function addSparks(x,y) {
+            for(let i=0;i<10;i++) sparks.push({x:x+(Math.random()-0.5)*40, y:y+(Math.random()-0.5)*20, vx:(Math.random()-0.5)*3, vy:-Math.random()*4-1, life:0.8, size:2});
+        }
+        function addVictorySparkle(x,y) {
+            for(let i=0;i<18;i++) victoryParticles.push({x:x+(Math.random()-0.5)*60, y:y+(Math.random()-0.5)*50, vx:(Math.random()-0.5)*2, vy:-Math.random()*2, life:1, color:`hsl(${45+Math.random()*40}, 90%, 65%)`});
+        }
+        
+        // 更新所有粒子
+        function updateParticles() {
+            for(let i=0;i<leaves.length;i++) { leaves[i].x+=leaves[i].vx; leaves[i].y+=leaves[i].vy; leaves[i].life-=0.015; if(leaves[i].life<=0||leaves[i].y>520) leaves.splice(i,1),i--;}
+            for(let i=0;i<dust.length;i++) { dust[i].x+=dust[i].vx; dust[i].y+=dust[i].vy; dust[i].life-=0.02; if(dust[i].life<=0||dust[i].y>500) dust.splice(i,1),i--;}
+            for(let i=0;i<sparks.length;i++) { sparks[i].x+=sparks[i].vx; sparks[i].y+=sparks[i].vy; sparks[i].life-=0.025; if(sparks[i].life<=0) sparks.splice(i,1),i--;}
+            for(let i=0;i<victoryParticles.length;i++) { victoryParticles[i].x+=victoryParticles[i].vx; victoryParticles[i].y+=victoryParticles[i].vy; victoryParticles[i].life-=0.01; if(victoryParticles[i].life<=0) victoryParticles.splice(i,1),i--;}
+        }
+        
+        // 绘制背景 (根据章节变换)
+        function drawBackground() {
+            if (act < 2) {
+                let grad = ctx.createLinearGradient(0,0,0,320);
+                grad.addColorStop(0,'#b2d28b'); grad.addColorStop(1,'#6b8c42');
+                ctx.fillStyle=grad; ctx.fillRect(0,0,900,300);
+                ctx.fillStyle='#4d6832'; ctx.fillRect(0,300,900,220);
+                for(let i=0;i<12;i++) ctx.fillStyle='#3c793c',ctx.fillRect(40+i*70,280,25,60);
+                clouds.forEach(c=>{ ctx.fillStyle='#f9f3cfcc'; ctx.beginPath(); ctx.ellipse(c.x,c.y,38,24,0,0,Math.PI*2); ctx.ellipse(c.x+26,c.y-10,30,21,0,0,Math.PI*2); ctx.fill();});
+            } 
+            else if (act >=2 && act <=4) {
+                ctx.fillStyle='#201c2a'; ctx.fillRect(0,0,900,520);
+                ctx.fillStyle='#493926'; for(let i=0;i<20;i++) ctx.fillRect(40+i*45,440+Math.sin(i)*8,20,60);
+                ctx.fillStyle='#e5a64d'; ctx.beginPath(); ctx.arc(110,310,38,0,Math.PI*2); ctx.fillStyle='#ffd58c'; ctx.fillRect(105,300,10,40);
+                for(let i=0;i<5;i++) ctx.fillStyle='#ffaf60',ctx.fillRect(120+i*180,350,18,45);
+            }
+            else if (act >=5) {
+                let sky = ctx.createLinearGradient(0,0,0,280);
+                sky.addColorStop(0,'#f9cc7c'); sky.addColorStop(1,'#e89342');
+                ctx.fillStyle=sky; ctx.fillRect(0,0,900,320);
+                ctx.fillStyle='#6f5230'; ctx.fillRect(0,320,900,200);
+                for(let i=0;i<40;i++) { ctx.fillStyle=`rgba(255,205,100,${0.3+Math.sin(frame*0.02+i)*0.2})`; ctx.fillRect(650+ i*8, 200, 4, 80);}
+                if(act>=7) stars.forEach(s=>{ctx.fillStyle=`rgba(255,245,170,${s.a})`; ctx.fillRect(s.x,s.y,2,2);});
+            }
+        }
+        
+        // 绘制勇者 (动态披风，成长感)
+        function drawHero(x,y,withSword=true) {
+            ctx.save();
+            ctx.fillStyle='#5d3630'; ctx.beginPath(); ctx.moveTo(x+20,y-8); ctx.quadraticCurveTo(x+36,y+10,x+14,y+34); ctx.fill(); //披风
+            ctx.fillStyle='#386035'; ctx.fillRect(x+6,y-14,28,38);
+            ctx.fillStyle='#ffddb0'; ctx.fillRect(x+8,y-12,24,32);
+            ctx.fillStyle='#c98f46'; ctx.fillRect(x+13,y-22,14,14);
+            ctx.fillStyle='#5c3e1a'; ctx.fillRect(x+18,y-28,5,8);
+            ctx.fillStyle='#fff'; ctx.fillRect(x+13,y-10,4,5); ctx.fillRect(x+23,y-10,4,5);
+            ctx.fillStyle='#000'; ctx.fillRect(x+14,y-9,2,3); ctx.fillRect(x+24,y-9,2,3);
+            if(withSword && (act>=2 || act===1)) { ctx.fillStyle='#b6854b'; ctx.fillRect(x+28, y-8, 28, 5); ctx.fillStyle='#dbb278'; ctx.fillRect(x+54, y-12, 10, 10);}
+            ctx.restore();
+        }
+        
+        // 灰狼
+        function drawWolf(x,y) { ctx.fillStyle='#5d6048'; ctx.beginPath(); ctx.ellipse(x,y,24,16,0,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#3c3e2e'; ctx.fillRect(x-16,y-6,12,10); ctx.fillStyle='#c2b35f'; ctx.fillRect(x-20,y-12,8,6); ctx.fillStyle='#fff'; ctx.fillRect(x-19,y-10,3,3);}
+        // 石魔像
+        function drawGolem(x,y) { ctx.fillStyle='#70706e'; ctx.fillRect(x-22,y-28,44,48); ctx.fillStyle='#553f2a'; ctx.fillRect(x-14,y-40,28,18); ctx.fillStyle='#2a77c4'; ctx.fillRect(x-12,y-38,8,8); ctx.fillRect(x+4,y-38,8,8); ctx.fillStyle='#d67a2c'; ctx.fillRect(x-14,y-14,10,16); ctx.fillRect(x+4,y-14,10,16);}
+        // 远古巨龙
+        function drawDragon(x,y,phaseAttack) {
+            ctx.fillStyle='#6b3f2c'; ctx.fillRect(x-35,y-20,70,50); ctx.fillStyle='#a66a38'; ctx.fillRect(x-25,y-42,50,32); 
+            ctx.fillStyle='#e3893a'; ctx.beginPath(); ctx.moveTo(x-38,y-10); ctx.lineTo(x-55,y-2); ctx.lineTo(x-42,y+4); ctx.fill(); //头冠
+            ctx.fillStyle='#fed97f'; ctx.fillRect(x-16,y-48,10,12); ctx.fillRect(x+6,y-48,10,12);
+            ctx.fillStyle='#d64531'; if(phaseAttack) { ctx.fillRect(x+35,y-10,40,12); ctx.fillRect(x+70,y-18,28,20); }
+            ctx.fillStyle='#4a2819'; ctx.fillRect(x-42,y+8,22,12); ctx.fillRect(x+20,y+8,22,12);
+        }
+        
+        // 龙晶 (史诗核心)
+        function drawCrystal(x,y,intensity) {
+            let g = 0.5+Math.sin(intensity)*0.5;
+            ctx.fillStyle=`rgba(255,210,100,${0.8+g*0.3})`; ctx.beginPath(); ctx.moveTo(x,y-15); ctx.lineTo(x+14,y+2); ctx.lineTo(x,y+18); ctx.lineTo(x-14,y+2); ctx.fill();
+            ctx.fillStyle='#fff6cc'; ctx.beginPath(); ctx.rect(x-4,y-3,8,8); ctx.fill();
+        }
+        
+        // 主绘制剧情驱动
+        function drawCinematic() {
+            drawBackground();
+            updateParticles();
+            // ---- 章节逻辑与动画推移 ----
+            if (act===0) { // 启程
+                drawHero(hero.x,hero.y);
+                if (hero.x<380) hero.x+=1.4; else hero.x=380;
+                if (frame>140 && hero.x>=378) { act=1; storyDiv.innerText=chapterTexts[1]; addLeafBurst(hero.x+25,hero.y-10); }
+            } 
+            else if (act===1) {  // 森林狼影
+                drawHero(hero.x,hero.y);
+                if(wolf.visible) drawWolf(wolf.x,wolf.y);
+                if(wolf.x > hero.x+50) wolf.x -= 1.2;
+                if(hero.x<580) hero.x+=1.2; else hero.x=580;
+                if(frame>300 && hero.x>=570) { act=2; storyDiv.innerText=chapterTexts[2]; golem.visible=true; addDustBurst(hero.x+30,hero.y);}
+            }
+            else if (act===2) { // 石魔像战斗
+                drawHero(hero.x,hero.y,true);
+                if(golem.visible) drawGolem(golem.x,golem.y);
+                if(golem.visible && golem.x>530) golem.x-=2.8;
+                if(golem.visible && golem.x<=530 && golem.hp>0) {
+                    if(frame%28===5) { slash.active=true; slash.x=hero.x+42; slash.y=hero.y-4; slash.timer=8; hitFlash=7; golem.hp-=1; addDustBurst(golem.x,golem.y-12); addSparks(golem.x,golem.y);}
+                    if(golem.hp<=0) { golem.visible=false; act=3; storyDiv.innerText=chapterTexts[3]; addVictorySparkle(golem.x, golem.y-20); crystalGlow=0; addLeafBurst(hero.x+30,hero.y);}
+                }
+                if(hitFlash>0) { ctx.fillStyle='#ffda99aa'; ctx.fillRect(0,0,900,520); hitFlash--; }
+            }
+            else if (act===3) { // 获得龙晶
+                drawHero(hero.x,hero.y);
+                crystalGlow+=0.12;
+                drawCrystal(hero.x+30,hero.y-15,crystalGlow);
+                ctx.fillStyle='rgba(255,235,140,0.4)'; ctx.fillRect(0,0,900,520);
+                if(frame>480) { act=4; storyDiv.innerText=chapterTexts[4]; dragon.visible=true; dragon.x=820; addDustBurst(hero.x+20, hero.y+10);}
+            }
+            else if (act===4) { // 巨龙崛起
+                drawHero(hero.x,hero.y,true);
+                if(dragon.visible) drawDragon(dragon.x,dragon.y, dragonFire.active);
+                if(dragon.x>550) dragon.x-=1.5;
+                if(dragon.x<=560 && dragon.visible && !dragonFire.active) {
+                    dragonFire.active=true; dragonFire.timer=30; addSparks(dragon.x+20, dragon.y-8); hitFlash=6;
+                    // 勇者受创
+                }
+                if(dragonFire.active) {
+                    ctx.fillStyle='#ff653aaa'; ctx.fillRect(0,0,900,520);
+                    dragonFire.timer--; if(dragonFire.timer<=0) dragonFire.active=false;
+                }
+                if(frame>680 && dragon.x<=560) { dragon.visible=false; act=5; storyDiv.innerText=chapterTexts[5]; addVictorySparkle(hero.x+40, hero.y-20);}
+            }
+            else if (act===5) { // 最终决战 · 龙晶碎魔影
+                drawHero(hero.x,hero.y,true);
+                ctx.fillStyle='#ffddcc33'; ctx.fillRect(0,0,900,520);
+                for(let i=0;i<3;i++) addSparks(hero.x+35, hero.y-12);
+                if(frame>800) { act=6; storyDiv.innerText=chapterTexts[6]; for(let i=0;i<40;i++) victoryParticles.push({x:hero.x+40+ (Math.random()-0.5)*80, y:hero.y-20+(Math.random()-0.5)*60, vx:(Math.random()-0.5)*2, vy:-Math.random()*3-1, life:1, color:`hsl(${50+Math.random()*40}, 85%, 65%)`}); }
+            }
+            else if (act===6) { // 凯旋归乡
+                drawHero(hero.x,hero.y);
+                if(hero.x>240) hero.x-=1.2; else hero.x=240;
+                victoryParticles.forEach(p=>{ ctx.fillStyle=p.color; ctx.fillRect(p.x,p.y,5,5); });
+                if(frame>980) { act=7; storyDiv.innerText=chapterTexts[7]; for(let i=0;i<60;i++) stars.push({x:Math.random()*900, y:Math.random()*220, a:0.4+Math.random()*0.6});}
+            }
+            else if (act===7) { // 英雄高地
+                drawHero(hero.x,hero.y);
+                ctx.fillStyle='#ffe2a4'; ctx.font='bold 26px monospace'; ctx.fillText('✨ 龙晶守护者 ✨', 350, 90);
+                if(frame>1180) { act=8; storyDiv.innerText=chapterTexts[8];}
+            }
+            else if (act===8) { // 永恒的传说
+                drawHero(hero.x,hero.y);
+                ctx.fillStyle='#ffde9e'; ctx.font='bold 22px monospace'; ctx.fillText('∞ 冒险永不终结 ∞', 360, 210);
+                ctx.fillStyle='#ffc285'; ctx.font='18px monospace'; ctx.fillText('“传说化作星辰，指引后人”', 340, 270);
+            }
+            
+            // 额外绘制战斗斩击特效与火焰粒子
+            if(slash.active) { ctx.fillStyle='#ffefb0'; ctx.beginPath(); ctx.moveTo(slash.x, slash.y); ctx.lineTo(slash.x+28, slash.y-12); ctx.lineTo(slash.x+15, slash.y+8); ctx.fill(); slash.timer--; if(slash.timer<=0) slash.active=false; }
+            if(dragonFire.active) { ctx.fillStyle='#fa824d'; ctx.beginPath(); ctx.ellipse(dragon.x+45, dragon.y-20, 40, 12, 0, 0, Math.PI*2); ctx.fill();}
+            
+            dust.forEach(d=>{ ctx.fillStyle=`rgba(70, 50, 30, ${d.life*0.8})`; ctx.fillRect(d.x,d.y,d.size+2,d.size); });
+            leaves.forEach(l=>{ ctx.fillStyle=`rgba(140, 110, 40, ${l.life})`; ctx.fillRect(l.x,l.y,l.size*0.8,l.size); });
+            sparks.forEach(s=>{ ctx.fillStyle='#ffac4d'; ctx.fillRect(s.x,s.y,3,3); });
+            victoryParticles.forEach(v=>{ ctx.fillStyle=v.color; ctx.fillRect(v.x,v.y,5,5); });
+            
+            // 屏幕震动效果
+            if(screenShake>0) { ctx.translate( (Math.random()-0.5)*4, (Math.random()-0.5)*2); screenShake--; }
+        }
+        
+        // 动画推进每帧
+        let frameCounter=0;
+        function animationLoop() {
+            frameCounter++;
+            frame = frameCounter;
+            drawCinematic();
+            if(act===2 && golem.hp===0) { /* 触发胜利后跳过重复 */ }
+            if(act===5 && frame>810 && act===5) act=6;
+            if(act===6 && frame>990 && act===6) act=7;
+            if(act===7 && frame>1190 && act===7) act=8;
+        }
+        
+        // 重置史诗
+        function resetAdventure() {
+            act = 0;
+            frameCounter = 0;
+            frame = 0;
+            hero = { x: 100, y: 400, facingRight: true };
+            wolf = { x: 780, y: 410, visible: true };
+            golem = { x: 850, y: 390, visible: false, hp: 3 };
+            dragon = { x: 820, y: 280, visible: false, phase: 0 };
+            crystalGlow = 0;
+            leaves = []; dust = []; sparks = []; victoryParticles = []; stars = [];
+            slash.active = false; hitFlash = 0; dragonFire.active = false;
+            storyDiv.innerText = chapterTexts[0];
+            for (let i=0;i<12;i++) addLeafBurst(hero.x+20,hero.y-5);
+            if (animInterval) clearInterval(animInterval);
+            animInterval = setInterval(() => { animationLoop(); }, 38);
+        }
+        
+        document.getElementById('restartEpicBtn').addEventListener('click', ()=>{
+            if(animInterval) clearInterval(animInterval);
+            resetAdventure();
+        });
+        
+        resetAdventure();
+    })();
+</script>
+</body>
+</html>

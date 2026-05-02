@@ -1,0 +1,620 @@
+以下是您所需的3D RPG冒险游戏的完整HTML代码。您将扮演一位勇者，在3D世界中探索、战斗并击败魔龙。
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>✨ 龙晶纪元 · 3D RPG 冒险 ✨</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Courier New', 'Segoe UI', monospace;
+        }
+        /* UI 面板 */
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(8px);
+            padding: 12px 20px;
+            border-radius: 30px;
+            color: #ffecb3;
+            border-left: 6px solid #f7b05e;
+            pointer-events: none;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+        #health-bar-container {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            width: 260px;
+            background: #3a2a2acc;
+            border-radius: 20px;
+            padding: 5px 10px;
+            backdrop-filter: blur(6px);
+            z-index: 100;
+            border: 1px solid #a97c4b;
+            pointer-events: none;
+        }
+        #health-fill {
+            width: 100%;
+            height: 18px;
+            background: #e34d4d;
+            border-radius: 20px;
+            transition: width 0.2s;
+            box-shadow: 0 0 6px #ff8866;
+        }
+        .stat-text {
+            font-size: 12px;
+            color: #ffe4b5;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+        #score-area {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #0f0e1ad9;
+            backdrop-filter: blur(8px);
+            padding: 10px 20px;
+            border-radius: 30px;
+            color: #facc15;
+            font-weight: bold;
+            font-size: 1.5rem;
+            font-family: monospace;
+            z-index: 100;
+            pointer-events: none;
+            text-align: center;
+            border-right: 3px solid gold;
+        }
+        #combat-log {
+            position: absolute;
+            bottom: 30px;
+            right: 20px;
+            width: 240px;
+            background: #000000aa;
+            backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 10px 15px;
+            font-size: 11px;
+            color: #cceeff;
+            font-family: monospace;
+            max-height: 120px;
+            overflow-y: auto;
+            pointer-events: none;
+            z-index: 100;
+            border: 1px solid #be8c54;
+        }
+        .log-line {
+            border-bottom: 1px solid #4a3a2c;
+            margin: 4px 0;
+        }
+        button {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4a3729;
+            border: none;
+            color: #ffefc0;
+            font-weight: bold;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-family: monospace;
+            cursor: pointer;
+            z-index: 200;
+            font-size: 1rem;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 12px black;
+            transition: 0.08s linear;
+        }
+        button:active {
+            transform: translateX(-50%) translateY(2px);
+        }
+        @media (max-width: 600px) {
+            #ui { font-size: 0.7rem; top: 10px; left: 10px; }
+            #health-bar-container { width: 180px; bottom: 15px; left: 10px; }
+            #score-area { font-size: 1.2rem; top: 10px; right: 10px; }
+            #combat-log { width: 180px; bottom: 70px; right: 10px; font-size: 9px; }
+            button { padding: 6px 18px; font-size: 0.8rem; bottom: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        🗡️ 龙魂勇者 · 讨伐远古巨龙 🛡️
+    </div>
+    <div id="health-bar-container">
+        <div class="stat-text">❤️ 生命精华</div>
+        <div id="health-fill" style="width: 100%"></div>
+        <div class="stat-text" style="font-size:10px;">⚔️ 攻击符文 | 近战斩杀</div>
+    </div>
+    <div id="score-area">
+        <span id="soulScore">0</span> <span style="font-size: 1rem;">⚡ 龙魂</span>
+    </div>
+    <div id="combat-log">
+        <div class="log-line">🌟 踏入龙息遗迹</div>
+        <div class="log-line">⚔️ 靠近魔物自动战斗！</div>
+        <div class="log-line">🐉 移动鼠标旋转视角 / WASD移动</div>
+    </div>
+    <button id="resetBtn">🔄 重启冒险</button>
+
+    <!-- 引入 Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+        // --- 初始化核心组件 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050b1a);
+        scene.fog = new THREE.FogExp2(0x050b1a, 0.012);
+        
+        // 相机: 第三人称俯视RPG风格
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(12, 8, 15);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // 开启阴影
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        
+        // CSS2渲染文字血条
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        labelRenderer.domElement.style.left = '0px';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+        
+        // --- 光照系统 ---
+        // 环境光
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+        // 主光源方向光
+        const dirLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+        dirLight.position.set(8, 20, 5);
+        dirLight.castShadow = true;
+        dirLight.receiveShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+        // 背光暖色
+        const backLight = new THREE.PointLight(0xcc9966, 0.5);
+        backLight.position.set(-3, 5, -6);
+        scene.add(backLight);
+        // 地面冷光
+        const fillLight = new THREE.PointLight(0x4466cc, 0.3);
+        fillLight.position.set(2, 2, 3);
+        scene.add(fillLight);
+        
+        // 地面网格+反射平面
+        const gridHelper = new THREE.GridHelper(40, 20, 0xa97c5c, 0x5a3e2a);
+        gridHelper.position.y = -0.5;
+        scene.add(gridHelper);
+        
+        const groundPlane = new THREE.Mesh(
+            new THREE.PlaneGeometry(30, 30),
+            new THREE.MeshStandardMaterial({ color: 0x2a2418, roughness: 0.8, metalness: 0.1 })
+        );
+        groundPlane.rotation.x = -Math.PI / 2;
+        groundPlane.position.y = -0.6;
+        groundPlane.receiveShadow = true;
+        scene.add(groundPlane);
+        
+        // 装饰性岩石 / 火把
+        const rockMat = new THREE.MeshStandardMaterial({ color: 0x6b5a48, roughness: 0.7 });
+        for (let i = 0; i < 60; i++) {
+            const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.2), rockMat);
+            const angle = Math.random() * Math.PI * 2;
+            const rad = 8 + Math.random() * 12;
+            rock.position.x = Math.cos(angle) * rad;
+            rock.position.z = Math.sin(angle) * rad;
+            rock.position.y = -0.5 + Math.random() * 0.3;
+            rock.scale.set(1, Math.random() * 0.8 + 0.5, 1);
+            rock.castShadow = true;
+            scene.add(rock);
+        }
+        
+        // --- 勇者 (帅气骑士风格) ---
+        const heroGroup = new THREE.Group();
+        const bodyGeo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x5c9e6b, metalness: 0.6 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.castShadow = true;
+        body.position.y = 0.4;
+        heroGroup.add(body);
+        
+        const headGeo = new THREE.SphereGeometry(0.5);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xfdd7a8 });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.position.y = 0.9;
+        head.castShadow = true;
+        heroGroup.add(head);
+        
+        const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0xcdad6e, metalness: 0.8 }));
+        helmet.position.y = 1.1;
+        helmet.castShadow = true;
+        heroGroup.add(helmet);
+        
+        const swordGeo = new THREE.BoxGeometry(0.2, 1.0, 0.2);
+        const swordMat = new THREE.MeshStandardMaterial({ color: 0xeecc99, metalness: 0.9 });
+        const sword = new THREE.Mesh(swordGeo, swordMat);
+        sword.position.set(0.6, 0.3, 0.4);
+        sword.castShadow = true;
+        heroGroup.add(sword);
+        
+        heroGroup.position.set(0, 0, 0);
+        heroGroup.castShadow = true;
+        scene.add(heroGroup);
+        
+        // 英雄数据
+        let heroHP = 100;
+        let maxHP = 100;
+        let soul = 0;
+        let attackPower = 18;
+        let gameActive = true;
+        
+        // 更新UI
+        function updateUI() {
+            const percent = Math.max(0, (heroHP / maxHP) * 100);
+            document.getElementById('health-fill').style.width = `${percent}%`;
+            document.getElementById('soulScore').innerText = soul;
+            if (heroHP <= 0 && gameActive) {
+                gameActive = false;
+                addLogMsg("💀 勇者陨落... 重启冒险吧 💀", true);
+                document.getElementById('resetBtn').style.background = "#b54a2c";
+            }
+        }
+        
+        function addLogMsg(msg, isError = false) {
+            const logDiv = document.getElementById('combat-log');
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            line.style.color = isError ? '#ffaa99' : '#cceeff';
+            line.innerHTML = isError ? `⚠️ ${msg}` : `✨ ${msg}`;
+            logDiv.appendChild(line);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            while (logDiv.children.length > 18) logDiv.removeChild(logDiv.firstChild);
+        }
+        
+        // 攻击特效 (闪白)
+        let attackEffect = 0;
+        function doAttack(targetName, damage) {
+            attackEffect = 6;
+            addLogMsg(`⚔️ 对 ${targetName} 造成 ${damage} 伤害!`);
+        }
+        
+        // --- 怪物系统 (带CSS血条)---
+        class RPGMonster {
+            constructor(name, hp, atk, model, posX, posZ, soulReward) {
+                this.name = name;
+                this.maxHp = hp;
+                this.hp = hp;
+                this.atk = atk;
+                this.model = model;
+                this.posX = posX;
+                this.posZ = posZ;
+                this.soulReward = soulReward;
+                this.active = true;
+                // CSS2D血条
+                const div = document.createElement('div');
+                div.textContent = `${name} ❤️ ${this.hp}/${this.maxHp}`;
+                div.style.backgroundColor = '#3a1f1aaa';
+                div.style.color = '#ffcf9a';
+                div.style.padding = '2px 8px';
+                div.style.borderRadius = '20px';
+                div.style.fontSize = '12px';
+                div.style.fontWeight = 'bold';
+                div.style.border = '1px solid #c97e3a';
+                div.style.backdropFilter = 'blur(4px)';
+                this.label = new CSS2DObject(div);
+                this.label.position.set(posX, 1.2, posZ);
+                scene.add(this.label);
+                model.position.set(posX, -0.2, posZ);
+                scene.add(model);
+            }
+            updateLabel() {
+                if (this.label && this.label.element) {
+                    this.label.element.textContent = `${this.name} ❤️ ${Math.max(0,this.hp)}/${this.maxHp}`;
+                    if (this.hp <= 0) this.label.element.style.opacity = '0';
+                }
+            }
+            takeDamage(amt) {
+                this.hp -= amt;
+                this.updateLabel();
+                if (this.hp <= 0 && this.active) {
+                    this.active = false;
+                    soul += this.soulReward;
+                    updateUI();
+                    addLogMsg(`🏆 击败 ${this.name} 获得 ${this.soulReward} 龙魂!`);
+                    // 消失动画
+                    if (this.model) scene.remove(this.model);
+                    if (this.label) scene.remove(this.label);
+                }
+                return this.hp <= 0;
+            }
+        }
+        
+        // 创建怪物模型 (独特)
+        function makeGoblinModel(color, scale = 0.7) {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.9, 8), new THREE.MeshStandardMaterial({ color: color, roughness: 0.4 }));
+            body.castShadow = true;
+            group.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.45), new THREE.MeshStandardMaterial({ color: 0xb57c48 }));
+            head.position.y = 0.7;
+            head.castShadow = true;
+            group.add(head);
+            const horns = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.4, 6), new THREE.MeshStandardMaterial({ color: 0x6a4a2a }));
+            horns.position.set(-0.2, 1.0, 0);
+            group.add(horns);
+            const horns2 = horns.clone(); horns2.position.set(0.2, 1.0, 0); group.add(horns2);
+            group.scale.set(scale, scale, scale);
+            return group;
+        }
+        function makeDragonModel() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 1.5), new THREE.MeshStandardMaterial({ color: 0xac4c2c, metalness: 0.3 }));
+            body.castShadow = true;
+            group.add(body);
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.8, 6), new THREE.MeshStandardMaterial({ color: 0xbc5a38 }));
+            neck.position.set(0.6, 0.5, 0.4);
+            group.add(neck);
+            const headD = new THREE.Mesh(new THREE.SphereGeometry(0.55), new THREE.MeshStandardMaterial({ color: 0xcd5c34 }));
+            headD.position.set(1.1, 0.7, 0.5);
+            group.add(headD);
+            const wingL = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 1.0, 0.1, 4), new THREE.MeshStandardMaterial({ color: 0x8a3c2a }));
+            wingL.rotation.z = 0.8;
+            wingL.position.set(-0.8, 0.6, 0);
+            group.add(wingL);
+            const wingR = wingL.clone(); wingR.rotation.z = -0.8; wingR.position.set(0.8, 0.6, 0); group.add(wingR);
+            return group;
+        }
+        
+        // 生成怪物列表
+        const monsters = [];
+        const goblin1 = makeGoblinModel(0x6d8f5e);
+        monsters.push(new RPGMonster("🌿 石皮哥布林", 48, 12, goblin1, -4.5, -4, 15));
+        const goblin2 = makeGoblinModel(0xab8e5a);
+        monsters.push(new RPGMonster("🔥 焰爪小鬼", 42, 14, goblin2, 5.2, -3, 16));
+        const ogre = makeGoblinModel(0x9a6e4c, 0.9);
+        monsters.push(new RPGMonster("🗿 岩石魔像", 68, 18, ogre, -2, 6, 28));
+        const dragonBoss = makeDragonModel();
+        monsters.push(new RPGMonster("🐉 暗影幼龙", 95, 24, dragonBoss, 4, 7.5, 55));
+        
+        // 移动控制
+        const keyState = { w: false, s: false, a: false, d: false };
+        let heroSpeed = 5.2;
+        let cameraAngle = 0;
+        
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w') keyState.w = true;
+            if (k === 's') keyState.s = true;
+            if (k === 'a') keyState.a = true;
+            if (k === 'd') keyState.d = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w') keyState.w = false;
+            if (k === 's') keyState.s = false;
+            if (k === 'a') keyState.a = false;
+            if (k === 'd') keyState.d = false;
+        });
+        
+        // 相机控制 (鼠标旋转)
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = false;
+        controls.enableZoom = true;
+        controls.zoomSpeed = 1.0;
+        controls.target.set(0, 1, 0);
+        controls.maxPolarAngle = Math.PI / 2.4;
+        
+        // 战斗冷却
+        let combatCooldown = 0;
+        
+        // 攻击动画光环
+        let attackGlow = 0;
+        
+        // 重置游戏
+        function resetGame() {
+            heroHP = maxHP;
+            soul = 0;
+            gameActive = true;
+            attackEffect = 0;
+            updateUI();
+            heroGroup.position.set(0, 0, 0);
+            // 重置所有怪物
+            monsters.forEach(m => {
+                m.hp = m.maxHp;
+                m.active = true;
+                if (m.model.parent !== scene && m.hp > 0) scene.add(m.model);
+                if (m.label.parent !== scene && m.hp > 0) scene.add(m.label);
+                m.updateLabel();
+                if (m.label.element) m.label.element.style.opacity = '1';
+            });
+            addLogMsg("✨ 时光逆转，冒险重启！");
+            document.getElementById('resetBtn').style.background = "#4a3729";
+        }
+        
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            resetGame();
+        });
+        
+        // 战斗逻辑: 检测附近敌人
+        function updateCombat(deltaTime) {
+            if (!gameActive) return;
+            if (combatCooldown > 0) combatCooldown -= deltaTime;
+            let closestDist = 2.4;
+            let targetMonster = null;
+            const heroPos = heroGroup.position;
+            for (let mon of monsters) {
+                if (!mon.active || mon.hp <= 0) continue;
+                const dx = mon.posX - heroPos.x;
+                const dz = mon.posZ - heroPos.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    targetMonster = mon;
+                }
+            }
+            if (targetMonster && combatCooldown <= 0 && heroHP > 0) {
+                // 玩家攻击
+                const damage = Math.floor(attackPower + Math.random() * 8);
+                const isDead = targetMonster.takeDamage(damage);
+                doAttack(targetMonster.name, damage);
+                combatCooldown = 0.7;
+                attackGlow = 0.25;
+                if (isDead) {
+                    // 击杀额外恢复少量生命
+                    const heal = 6;
+                    heroHP = Math.min(maxHP, heroHP + heal);
+                    updateUI();
+                    addLogMsg(`💚 龙魂治愈 +${heal} HP`);
+                }
+                // 怪物反击
+                if (!isDead && targetMonster.active) {
+                    const monsterDmg = Math.max(4, targetMonster.atk + Math.floor(Math.random() * 7) - 4);
+                    heroHP -= monsterDmg;
+                    updateUI();
+                    addLogMsg(`💢 ${targetMonster.name} 反击造成 ${monsterDmg} 伤害!`, true);
+                    if (heroHP <= 0) {
+                        gameActive = false;
+                        addLogMsg(`💀 战死沙场... 点击重启`, true);
+                        document.getElementById('resetBtn').style.background = "#b54a2c";
+                    }
+                }
+            }
+        }
+        
+        // 移动与边界
+        function updateMovement(deltaTime) {
+            if (!gameActive) return;
+            let move = new THREE.Vector3(0, 0, 0);
+            if (keyState.w) move.z -= 1;
+            if (keyState.s) move.z += 1;
+            if (keyState.a) move.x -= 1;
+            if (keyState.d) move.x += 1;
+            move.normalize();
+            const speed = heroSpeed * deltaTime;
+            let newX = heroGroup.position.x + move.x * speed;
+            let newZ = heroGroup.position.z + move.z * speed;
+            // 边界限制 (半径12米圆形竞技场)
+            const limit = 11;
+            newX = Math.min(limit, Math.max(-limit, newX));
+            newZ = Math.min(limit, Math.max(-limit, newZ));
+            heroGroup.position.x = newX;
+            heroGroup.position.z = newZ;
+            
+            // 简单旋转朝向 (根据移动方向)
+            if (move.x !== 0 || move.z !== 0) {
+                const angle = Math.atan2(move.x, move.z);
+                heroGroup.rotation.y = angle;
+            }
+            // 控制相机跟随目标
+            controls.target.lerp(new THREE.Vector3(heroGroup.position.x, 1.2, heroGroup.position.z), 0.08);
+        }
+        
+        // 攻击特效、光环
+        let lastTimestamp = 0;
+        function animate(currentTime) {
+            const delta = Math.min(0.033, (currentTime - lastTimestamp) / 1000);
+            lastTimestamp = currentTime;
+            
+            if (delta < 0.005) { requestAnimationFrame(animate); return; }
+            
+            updateMovement(delta);
+            updateCombat(delta);
+            
+            // 动态特效
+            if (attackEffect > 0) {
+                attackEffect -= delta * 12;
+                const intensity = Math.min(1, attackEffect / 3);
+                const lightMat = new THREE.MeshStandardMaterial({ color: 0xffaa66, emissive: 0x442200 });
+                sword.material = lightMat;
+                setTimeout(() => { sword.material = new THREE.MeshStandardMaterial({ color: 0xeecc99, metalness: 0.9 }); }, 100);
+            }
+            if (attackGlow > 0) {
+                attackGlow -= delta * 2;
+                const glowIntensity = Math.min(0.8, attackGlow);
+                dirLight.intensity = 1.2 + glowIntensity * 1.2;
+            } else {
+                dirLight.intensity = 1.2;
+            }
+            
+            // 怪物浮动及更新位置同步label
+            monsters.forEach(mon => {
+                if (mon.active && mon.model) {
+                    mon.model.position.y = -0.2 + Math.sin(Date.now() * 0.005) * 0.05;
+                    if (mon.label) mon.label.position.y = 1.2 + Math.sin(Date.now() * 0.008) * 0.03;
+                }
+            });
+            
+            // 闪避粒子光环
+            const ringLight = new THREE.PointLight(0xff8844, 0.5);
+            ringLight.position.copy(heroGroup.position);
+            ringLight.position.y += 0.5;
+            scene.add(ringLight);
+            setTimeout(() => scene.remove(ringLight), 50);
+            
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        
+        // 添加一些环境粒子 (萤火虫)
+        const particleGeo = new THREE.BufferGeometry();
+        const particleCount = 300;
+        const particlePos = [];
+        for (let i = 0; i < particleCount; i++) {
+            particlePos.push((Math.random() - 0.5) * 34);
+            particlePos.push(Math.random() * 5);
+            particlePos.push((Math.random() - 0.5) * 28);
+        }
+        particleGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(particlePos), 3));
+        const particleMat = new THREE.PointsMaterial({ color: 0xffaa66, size: 0.08, transparent: true, opacity: 0.5 });
+        const particles = new THREE.Points(particleGeo, particleMat);
+        scene.add(particles);
+        
+        function animateParticles() {
+            particles.rotation.y += 0.005;
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+        
+        // 启动游戏循环
+        resetGame();
+        requestAnimationFrame(animate);
+        
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        addLogMsg("🐉 黑暗魔龙在遗迹咆哮！靠近怪物自动攻击，击败获得龙魂!");
+    </script>
+</body>
+</html>
+```

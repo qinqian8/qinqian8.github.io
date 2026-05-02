@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>✨ 勇者冒险 · 像素动画史诗 ✨</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a1920, #071217);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .adventure-container {
+            background: #1e2a2a;
+            border-radius: 48px;
+            padding: 20px;
+            box-shadow: 0 30px 40px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 28px;
+            box-shadow: 0 0 0 4px #f4c542, 0 15px 30px black;
+            cursor: pointer;
+            background: #0b2b1f;
+        }
+
+        .story-panel {
+            background: #0f181ccc;
+            backdrop-filter: blur(8px);
+            margin-top: 18px;
+            padding: 12px 20px;
+            border-radius: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            border: 1px solid #d4a75a;
+        }
+
+        button {
+            background: linear-gradient(180deg, #4e3b2c, #2f241b);
+            border: none;
+            color: #ffefc0;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 1rem;
+            padding: 8px 22px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.08s linear;
+            box-shadow: 0 5px 0 #1a130c;
+        }
+
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #1a130c;
+        }
+
+        .caption {
+            color: #fbeba0;
+            font-size: 0.9rem;
+            text-shadow: 0 2px 2px black;
+            background: #00000077;
+            padding: 5px 15px;
+            border-radius: 32px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        @keyframes pulseGlow {
+            0% { text-shadow: 0 0 0 #ffb347; }
+            100% { text-shadow: 0 0 8px #ffb347; }
+        }
+
+        .restart-btn {
+            background: #5f4330;
+            box-shadow: 0 5px 0 #3a2a1e;
+        }
+    </style>
+</head>
+<body>
+<div class="adventure-container">
+    <canvas id="heroCanvas" width="800" height="480"></canvas>
+    <div class="story-panel">
+        <div class="caption" id="storyText">⚔️ 勇者踏入迷雾森林 ⚔️</div>
+        <div>
+            <button id="resetAnimBtn">🔄 重历传奇</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const canvas = document.getElementById('heroCanvas');
+        const ctx = canvas.getContext('2d');
+        const storyDiv = document.getElementById('storyText');
+
+        // 动画状态机
+        let animPhase = 0;          // 0-6 代表冒险章节
+        let frameCounter = 0;
+        let animInterval = null;
+        
+        // 精灵数据 (坐标/特效参数)
+        let heroX = 100, heroY = 340;      // 勇者位置
+        let wolfX = 700, wolfY = 360;
+        let crystalGlow = 0;
+        let dustParticles = [];
+        let leafParticles = [];
+        let stoneGolemX = 850, stoneGolemVisible = false;
+        let crystalLight = 0;
+        let torchFlicker = 0;
+        
+        // 场景装饰物
+        let clouds = [{x: 120, y: 50}, {x: 500, y: 70}, {x: 680, y: 40}];
+        let stars = [];
+        for (let i=0; i<80; i++) stars.push({x: Math.random()*800, y: Math.random()*200, alpha: 0.5+Math.random()*0.5});
+        
+        // 战斗特效
+        let slashEffect = { active: false, timer: 0, x: 0, y: 0 };
+        let hitFlash = 0;
+        
+        // 章节故事文本映射
+        const chapterTexts = [
+            "🌅 黎明，勇者紧握木剑，告别村庄，踏上征途。",
+            "🌲 穿过幽暗密林，灰狼暗中跟随，勇者毫不退缩。",
+            "⛰️ 山洞深处，石像守卫双眼亮起蓝光！战斗开始！",
+            "⚡ 翻滚！格挡！一击裂石！勇者击败守卫，获得发光水晶。",
+            "🏆 水晶闪耀，照亮整个洞窟，远古祝福降临。",
+            "🌈 晨曦洒落，勇者带着传说水晶回到故乡，人们高声欢呼。",
+            "✨ 英雄站在高塔之上，披风飞扬，远方新的冒险等待..."
+        ];
+        
+        // 重置所有
+        function resetAdventure() {
+            // 重置动画全局变量
+            animPhase = 0;
+            frameCounter = 0;
+            heroX = 100;
+            wolfX = 700;
+            stoneGolemVisible = false;
+            stoneGolemX = 850;
+            crystalGlow = 0;
+            slashEffect.active = false;
+            hitFlash = 0;
+            dustParticles = [];
+            leafParticles = [];
+            crystalLight = 0;
+            torchFlicker = 0;
+            storyDiv.innerText = chapterTexts[0];
+            drawScene();
+            if (animInterval) clearInterval(animInterval);
+            startAnimationLoop();
+        }
+        
+        // 生成落叶
+        function addLeafBurst() {
+            for (let i=0;i<12;i++) {
+                leafParticles.push({
+                    x: heroX + 15 + (Math.random() - 0.5) * 40,
+                    y: heroY + (Math.random() * 30),
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: -Math.random() * 3 - 1,
+                    life: 1.0,
+                    size: 4 + Math.random() * 5
+                });
+            }
+        }
+        
+        // 战斗尘土粒子
+        function addDustBurst(x, y) {
+            for (let i=0;i<10;i++) {
+                dustParticles.push({
+                    x: x + (Math.random() - 0.5) * 25,
+                    y: y + (Math.random() - 0.5) * 20,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: (Math.random() - 0.5) * 3 - 1,
+                    life: 0.9,
+                    size: 3+Math.random()*5
+                });
+            }
+        }
+        
+        // 更新粒子
+        function updateParticles() {
+            for (let i=0; i<dustParticles.length; i++) {
+                dustParticles[i].x += dustParticles[i].vx;
+                dustParticles[i].y += dustParticles[i].vy;
+                dustParticles[i].life -= 0.02;
+                if (dustParticles[i].life <= 0 || dustParticles[i].y > 500) {
+                    dustParticles.splice(i,1);
+                    i--;
+                }
+            }
+            for (let i=0; i<leafParticles.length; i++) {
+                leafParticles[i].x += leafParticles[i].vx;
+                leafParticles[i].y += leafParticles[i].vy;
+                leafParticles[i].life -= 0.015;
+                if (leafParticles[i].life <= 0 || leafParticles[i].y > 470) {
+                    leafParticles.splice(i,1);
+                    i--;
+                }
+            }
+        }
+        
+        // 绘制背景 (森林/洞穴/城堡氛围)
+        function drawBackground() {
+            // 天空/洞穴渐变
+            if (animPhase < 2) {
+                // 森林清晨
+                let grad = ctx.createLinearGradient(0, 0, 0, 300);
+                grad.addColorStop(0, '#8cb36c');
+                grad.addColorStop(1, '#4d7040');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 280);
+                ctx.fillStyle = '#386035';
+                ctx.fillRect(0, 280, 800, 200);
+                // 树丛
+                for (let i=0; i<14; i++) {
+                    ctx.fillStyle = '#2f6b2f';
+                    ctx.beginPath();
+                    ctx.moveTo(40+i*70, 270);
+                    ctx.lineTo(20+i*70, 340);
+                    ctx.lineTo(60+i*70, 340);
+                    ctx.fill();
+                }
+                // 云
+                clouds.forEach(c=>{
+                    ctx.fillStyle = '#eef4c3aa';
+                    ctx.beginPath();
+                    ctx.ellipse(c.x, c.y, 32, 22, 0, 0, Math.PI*2);
+                    ctx.ellipse(c.x+25, c.y-8, 28, 20, 0, 0, Math.PI*2);
+                    ctx.ellipse(c.x-20, c.y-5, 25, 18, 0, 0, Math.PI*2);
+                    ctx.fill();
+                });
+            } 
+            else if (animPhase >= 2 && animPhase <= 4) {
+                // 洞穴暗光
+                ctx.fillStyle = '#1a1f2c';
+                ctx.fillRect(0, 0, 800, 480);
+                ctx.fillStyle = '#2d2418';
+                for (let i=0;i<80;i++) ctx.fillRect(40+i*15, 380+Math.sin(i)*12, 8, 60);
+                ctx.fillStyle = '#7a5a3e';
+                ctx.beginPath();
+                ctx.rect(0, 350, 800, 130);
+                ctx.fill();
+                // 火把光晕
+                torchFlicker = (torchFlicker + 0.1) % (Math.PI*2);
+                let flick = 8 + Math.sin(torchFlicker*5)*3;
+                ctx.fillStyle = '#ffb34755';
+                ctx.beginPath();
+                ctx.arc(70, 300, 40+flick, 0, Math.PI*2);
+                ctx.fill();
+                ctx.fillStyle = '#ff914d';
+                ctx.fillRect(65, 290, 10, 35);
+                ctx.fillStyle = '#ffd966';
+                ctx.beginPath();
+                ctx.ellipse(70, 285, 8, 14, 0, 0, Math.PI*2);
+                ctx.fill();
+            } 
+            else {
+                // 黎明城堡景
+                let grad = ctx.createLinearGradient(0, 0, 0, 380);
+                grad.addColorStop(0, '#f7c978');
+                grad.addColorStop(1, '#b5894e');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 800, 360);
+                ctx.fillStyle = '#5e7546';
+                ctx.fillRect(0, 360, 800, 120);
+                ctx.fillStyle = '#9b7e55';
+                ctx.fillRect(620, 150, 100, 230);
+                ctx.fillStyle = '#dbb46a';
+                for (let i=0;i<4;i++) ctx.fillRect(630+i*20, 170, 12, 50);
+                ctx.fillStyle = '#eedb9b';
+                ctx.beginPath();
+                ctx.moveTo(670, 100); ctx.lineTo(710, 140); ctx.lineTo(630, 140); ctx.fill();
+                stars.forEach(s=>{
+                    ctx.fillStyle = `rgba(255,240,180,${s.alpha*0.7})`;
+                    ctx.fillRect(s.x, s.y, 2, 2);
+                });
+            }
+        }
+        
+        // 绘制勇者 (带披风飘动)
+        function drawHero(x, y, isFighting=false) {
+            ctx.save();
+            // 披风
+            ctx.fillStyle = '#8b3c2c';
+            ctx.beginPath();
+            ctx.moveTo(x+18, y-8);
+            ctx.quadraticCurveTo(x+30, y+12, x+12, y+28);
+            ctx.fill();
+            ctx.fillStyle = '#2b4428';
+            ctx.fillRect(x+6, y-12, 24, 32);
+            ctx.fillStyle = '#ffcf9a';
+            ctx.fillRect(x+8, y-10, 20, 28);
+            // 头盔/头发
+            ctx.fillStyle = '#ca9642';
+            ctx.fillRect(x+12, y-18, 12, 12);
+            ctx.fillStyle = '#553a1a';
+            ctx.fillRect(x+16, y-22, 4, 8);
+            // 眼睛
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x+12, y-8, 4, 4);
+            ctx.fillRect(x+20, y-8, 4, 4);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(x+13, y-7, 2, 3);
+            ctx.fillRect(x+21, y-7, 2, 3);
+            // 木剑
+            if (isFighting || slashEffect.active) {
+                ctx.fillStyle = '#aa8866';
+                ctx.fillRect(x+25, y-6, 22, 4);
+                ctx.fillStyle = '#d9b48b';
+                ctx.fillRect(x+45, y-8, 8, 8);
+            } else {
+                ctx.fillStyle = '#aa8866';
+                ctx.fillRect(x+22, y-4, 20, 3);
+            }
+            // 披风飘动特效
+            ctx.fillStyle = '#b54a36';
+            ctx.beginPath();
+            ctx.moveTo(x+8, y+4);
+            ctx.quadraticCurveTo(x, y+12, x+8, y+24);
+            ctx.fill();
+            ctx.restore();
+        }
+        
+        // 灰狼
+        function drawWolf(x, y) {
+            ctx.fillStyle = '#5a5e4a';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 20, 14, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#3f4232';
+            ctx.fillRect(x-15, y-4, 10, 8);
+            ctx.fillStyle = '#a5a55a';
+            ctx.fillRect(x-18, y-8, 6, 6);
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(x-17, y-7, 2, 2);
+        }
+        
+        // 石魔像
+        function drawGolem(x, y) {
+            ctx.fillStyle = '#6f6f72';
+            ctx.fillRect(x-15, y-22, 32, 40);
+            ctx.fillStyle = '#504b3a';
+            ctx.fillRect(x-10, y-30, 20, 12);
+            ctx.fillStyle = '#b56a2e';
+            ctx.fillRect(x-10, y-8, 6, 12);
+            ctx.fillRect(x+4, y-8, 6, 12);
+            ctx.fillStyle = '#2f78cf';
+            ctx.fillRect(x-8, y-28, 6, 6);
+            ctx.fillRect(x+2, y-28, 6, 6);
+        }
+        
+        // 绘制发光水晶
+        function drawCrystal(x, y, glowIntensity) {
+            let glow = 0.5 + Math.sin(glowIntensity)*0.5;
+            ctx.fillStyle = `rgba(255, 220, 100, ${0.7+glow*0.3})`;
+            ctx.beginPath();
+            ctx.moveTo(x, y-8);
+            ctx.lineTo(x+10, y+2);
+            ctx.lineTo(x, y+12);
+            ctx.lineTo(x-10, y+2);
+            ctx.fill();
+            ctx.fillStyle = '#fff3b0';
+            ctx.beginPath();
+            ctx.rect(x-3, y-2, 6, 6);
+            ctx.fill();
+        }
+        
+        // 绘制动态场景 (根据animPhase驱动剧情)
+        function drawScene() {
+            drawBackground();
+            updateParticles();
+            
+            // 根据动画阶段绘制不同的地图元素与勇者动作
+            if (animPhase === 0) {
+                // 启程阶段
+                drawHero(heroX, heroY);
+                if (heroX < 280) heroX += 1.4;
+                else { heroX = 280; }
+                ctx.fillStyle = '#c9ae6e';
+                ctx.font = "bold 14px monospace";
+                ctx.fillText("🏠 遗忘村庄", 40, 100);
+                if (frameCounter > 90 && heroX >= 280 && animPhase===0) {
+                    animPhase = 1;
+                    storyDiv.innerText = chapterTexts[1];
+                    addLeafBurst();
+                }
+            } 
+            else if (animPhase === 1) {
+                // 森林 / 狼跟随
+                drawHero(heroX, heroY);
+                drawWolf(wolfX, wolfY);
+                if (wolfX > heroX+40) wolfX -= 1.2;
+                if (heroX < 480) heroX += 1.3;
+                else heroX = 480;
+                if (frameCounter > 180 && heroX>=470) {
+                    animPhase = 2;
+                    storyDiv.innerText = chapterTexts[2];
+                    stoneGolemVisible = true;
+                    stoneGolemX = 720;
+                    addDustBurst(heroX+20, heroY);
+                }
+            }
+            else if (animPhase === 2) {
+                // 石像守卫出现
+                drawHero(heroX, heroY);
+                if (stoneGolemVisible) {
+                    drawGolem(stoneGolemX, 340);
+                    if (stoneGolemX > 550) stoneGolemX -= 3;
+                    else {
+                        // 进入战斗特效
+                        if (frameCounter % 20 === 0) addDustBurst(heroX+25, heroY+12);
+                        if (!slashEffect.active && frameCounter % 50 === 5) {
+                            slashEffect.active = true;
+                            slashEffect.timer = 8;
+                            slashEffect.x = heroX+35;
+                            slashEffect.y = heroY-4;
+                            hitFlash = 6;
+                            addDustBurst(stoneGolemX, 330);
+                        }
+                        if (stoneGolemX <= 530) {
+                            stoneGolemVisible = false;
+                            animPhase = 3;
+                            storyDiv.innerText = chapterTexts[3];
+                            addDustBurst(550, 340);
+                            crystalLight = 1;
+                        }
+                    }
+                }
+                drawHero(heroX, heroY, true);
+                if (hitFlash > 0) {
+                    ctx.fillStyle = '#ffcc88aa';
+                    ctx.fillRect(0,0,800,480);
+                    hitFlash--;
+                }
+            }
+            else if (animPhase === 3) {
+                // 获得水晶
+                drawHero(heroX, heroY);
+                crystalGlow += 0.1;
+                drawCrystal(heroX+15, heroY-10, crystalGlow);
+                if (crystalLight > 0) {
+                    ctx.fillStyle = `rgba(255,220,150,${crystalLight*0.2})`;
+                    ctx.fillRect(0,0,800,480);
+                    crystalLight -= 0.01;
+                }
+                if (frameCounter % 40 === 0) addLeafBurst();
+                if (frameCounter > 270 && animPhase === 3) {
+                    animPhase = 4;
+                    storyDiv.innerText = chapterTexts[4];
+                    crystalGlow = 0;
+                }
+            }
+            else if (animPhase === 4) {
+                drawHero(heroX, heroY);
+                // 光芒四射
+                let p = (Date.now() % 800) / 800;
+                ctx.fillStyle = `rgba(255,235,120,0.3)`;
+                ctx.beginPath();
+                ctx.arc(heroX+18, heroY-4, 35+Math.sin(p*Math.PI*2)*8, 0, Math.PI*2);
+                ctx.fill();
+                drawCrystal(heroX+15, heroY-10, crystalGlow+0.2);
+                if (heroX > 120) heroX -= 1.2;
+                else heroX=120;
+                if (frameCounter > 380) {
+                    animPhase = 5;
+                    storyDiv.innerText = chapterTexts[5];
+                }
+            }
+            else if (animPhase === 5) {
+                drawHero(heroX, heroY);
+                ctx.fillStyle = '#ffe087';
+                ctx.font = "bold 20px monospace";
+                ctx.shadowBlur = 12;
+                ctx.fillText("🏅 勇者凯旋 🏅", 320, 80);
+                ctx.shadowBlur = 0;
+                for(let i=0;i<8;i++) {
+                    ctx.fillStyle = `rgba(255,200,80,${0.4+Math.sin(Date.now()*0.01+i)*0.3})`;
+                    ctx.fillRect(380+ i*12, 120, 6, 40);
+                }
+                if (frameCounter > 560) {
+                    animPhase = 6;
+                    storyDiv.innerText = chapterTexts[6];
+                }
+            }
+            else if (animPhase >= 6) {
+                drawHero(heroX, heroY);
+                ctx.fillStyle = '#e9c78e';
+                ctx.font = "bold 18px monospace";
+                ctx.fillText("✧ 传说永存 ✧", 340, 210);
+                // 鹰飞过
+                ctx.fillStyle = '#6a5632';
+                ctx.beginPath();
+                ctx.moveTo(600+Math.sin(Date.now()*0.008)*20, 70);
+                ctx.lineTo(620+Math.sin(Date.now()*0.008)*10, 65);
+                ctx.lineTo(610+Math.sin(Date.now()*0.008)*15, 78);
+                ctx.fill();
+            }
+            
+            // 绘制战斗斩击特效
+            if (slashEffect.active) {
+                ctx.fillStyle = '#ffdd99';
+                ctx.beginPath();
+                ctx.moveTo(slashEffect.x, slashEffect.y);
+                ctx.lineTo(slashEffect.x+25, slashEffect.y-10);
+                ctx.lineTo(slashEffect.x+12, slashEffect.y+8);
+                ctx.fill();
+                slashEffect.timer--;
+                if (slashEffect.timer <= 0) slashEffect.active = false;
+            }
+            
+            // 粒子系统 (尘土/落叶)
+            dustParticles.forEach(p=>{
+                ctx.fillStyle = `rgba(100, 70, 40, ${p.life*0.8})`;
+                ctx.fillRect(p.x, p.y, p.size, p.size*0.6);
+            });
+            leafParticles.forEach(l=>{
+                ctx.fillStyle = `rgba(180, 140, 50, ${l.life})`;
+                ctx.fillRect(l.x, l.y, l.size*0.8, l.size);
+            });
+            // 动态故事闪烁提示
+            if (frameCounter % 60 < 25 && (animPhase===1 || animPhase===2)) {
+                ctx.fillStyle = "#fff0a0";
+                ctx.font = "bold 12px monospace";
+                ctx.fillText("⚡ 遭遇危险... 战斗意志 ⚡", 310, 430);
+            }
+        }
+        
+        // 动画循环 (时间驱动)
+        function startAnimationLoop() {
+            if (animInterval) clearInterval(animInterval);
+            animInterval = setInterval(() => {
+                frameCounter++;
+                drawScene();
+                // 自动根据帧计数器推动章节（防止卡死）
+                if (animPhase === 0 && frameCounter > 120 && heroX >= 270) { /* 手动由drawScene推进，但确保安全 */ }
+                if (animPhase === 1 && heroX >= 470 && frameCounter > 200 && animPhase===1) animPhase=2;
+                if (animPhase === 2 && !stoneGolemVisible && frameCounter > 30 && animPhase===2) { /* 已在drawScene推进，无需额外 */ }
+                if (animPhase === 4 && heroX <= 130 && frameCounter > 380 && animPhase===4) animPhase=5;
+                if (animPhase === 5 && frameCounter > 580 && animPhase===5) animPhase=6;
+                if (animPhase === 6 && frameCounter > 800) { /* 最终保持 */ }
+            }, 35);
+        }
+        
+        // 重置按钮逻辑
+        document.getElementById('resetAnimBtn').addEventListener('click', () => {
+            if (animInterval) clearInterval(animInterval);
+            resetAdventure();
+        });
+        
+        // 初始化绘制
+        resetAdventure();
+    })();
+</script>
+</body>
+</html>

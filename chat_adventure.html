@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>3D Mini RPG Adventure</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        #ui { position: absolute; top: 20px; left: 20px; color: white; text-shadow: 2px 2px #000; pointer-events: none; }
+        .controls { position: absolute; bottom: 20px; left: 20px; color: #aaa; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <h1>3D ADVENTURE</h1>
+        <p>Score: <span id="score">0</span></p>
+    </div>
+    <div class="controls">WASD to Move | Collect the Golden Cubes</div>
+
+    <!-- Loading Three.js from CDN -->
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // 1. Setup Scene
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Sky Blue
+        scene.fog = new THREE.Fog(0x87ceeb, 10, 50);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // 2. Lights
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        sun.position.set(5, 10, 7.5);
+        sun.castShadow = true;
+        scene.add(sun);
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // 3. Ground
+        const groundGeo = new THREE.PlaneGeometry(100, 100);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x228b22 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // 4. Hero
+        const heroGeo = new THREE.BoxGeometry(1, 1, 1);
+        const heroMat = new THREE.MeshStandardMaterial({ color: 0x00ffcc });
+        const hero = new THREE.Mesh(heroGeo, heroMat);
+        hero.position.y = 0.5;
+        hero.castShadow = true;
+        scene.add(hero);
+
+        // 5. Collectibles (Coins)
+        const coins = [];
+        function createCoin(x, z) {
+            const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
+            const coin = new THREE.Mesh(geo, mat);
+            coin.position.set(x, 0.5, z);
+            scene.add(coin);
+            coins.push(coin);
+        }
+        for(let i=0; i<10; i++) createCoin(Math.random()*20-10, Math.random()*20-10);
+
+        // 6. Input Handling
+        const keys = {};
+        window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+
+        let score = 0;
+
+        // 7. Game Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Movement
+            const speed = 0.15;
+            if (keys['w']) hero.position.z -= speed;
+            if (keys['s']) hero.position.z += speed;
+            if (keys['a']) hero.position.x -= speed;
+            if (keys['d']) hero.position.x += speed;
+
+            // Camera follow (Third-person)
+            camera.position.set(hero.position.x, hero.position.y + 5, hero.position.z + 10);
+            camera.lookAt(hero.position);
+
+            // Coin rotation & Collision
+            coins.forEach((coin, index) => {
+                coin.rotation.y += 0.05;
+                if (hero.position.distanceTo(coin.position) < 1) {
+                    scene.remove(coin);
+                    coins.splice(index, 1);
+                    score++;
+                    document.getElementById('score').innerText = score;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+
+        animate();
+    </script>
+</body>
+</html>

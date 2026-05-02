@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>✨ 微光传说 | 文字RPG冒险游戏</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a0f1a 0%, #0c1222 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', 'Courier New', 'PingFang SC', monospace;
+            padding: 20px;
+            margin: 0;
+        }
+
+        /* 复古RPG风格主面板 */
+        .rpg-container {
+            max-width: 750px;
+            width: 100%;
+            background: #1e2a2f;
+            background-image: radial-gradient(circle at 10% 20%, #2a3b3f 2%, #162026 80%);
+            border-radius: 48px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.7), inset 0 1px 2px rgba(255, 255, 255, 0.1);
+            border: 1px solid #c9b16b;
+            overflow: hidden;
+            backdrop-filter: blur(2px);
+        }
+
+        /* 冒险标题区 */
+        .hero-title {
+            background: #0e1a1f;
+            padding: 12px 20px;
+            text-align: center;
+            border-bottom: 2px solid #f0c674;
+            box-shadow: inset 0 -1px 0 #4a5b4c;
+        }
+        .hero-title h1 {
+            color: #ffdf8c;
+            letter-spacing: 3px;
+            font-size: 1.7rem;
+            text-shadow: 0 2px 5px #5a3e1a;
+            margin: 0;
+        }
+        .hero-title p {
+            color: #b9d2b0;
+            font-size: 0.7rem;
+            margin: 4px 0 0;
+        }
+
+        /* 状态面板（角色数值） */
+        .status-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 20px 20px 12px 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid #cbb26a;
+        }
+        .hero-stats {
+            flex: 2;
+            background: #0f191ecc;
+            backdrop-filter: blur(4px);
+            border-radius: 28px;
+            padding: 12px 20px;
+            border-left: 8px solid #e6b450;
+            box-shadow: inset 0 0 6px #00000033, 0 6px 12px rgba(0,0,0,0.3);
+        }
+        .stat-name {
+            font-weight: bold;
+            color: #fbd26a;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .stat-name span {
+            background: #263b30;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            color: #c5e0b4;
+        }
+        .hp-bar, .exp-bar {
+            margin: 8px 0;
+            height: 12px;
+            background: #3a2a1c;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+        .hp-fill {
+            width: 100%;
+            height: 100%;
+            background: #e34d4d;
+            border-radius: 20px;
+            transition: width 0.2s;
+        }
+        .exp-fill {
+            background: #6ab04c;
+            width: 0%;
+            height: 100%;
+            transition: width 0.2s;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            color: #ddddcc;
+            font-size: 0.85rem;
+        }
+        .combat-zone {
+            flex: 1;
+            background: #091217b3;
+            border-radius: 24px;
+            padding: 8px 15px;
+            text-align: center;
+            border: 1px solid #7f6b3c;
+        }
+        .combat-zone h4 {
+            margin: 6px 0;
+            color: #f3b45a;
+        }
+        #combatPower {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #e6b422;
+        }
+
+        /* 冒险log区 (展示事件) */
+        .log-area {
+            background: #030b0fcc;
+            margin: 12px 20px;
+            border-radius: 28px;
+            padding: 14px 18px;
+            min-height: 130px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            border: 1px solid #bca86b;
+            color: #ebe4c2;
+            box-shadow: inset 0 0 15px #00000040;
+            overflow-y: auto;
+        }
+        .log-line {
+            border-left: 3px solid #e5b83c;
+            padding-left: 10px;
+            margin: 8px 0;
+            word-break: break-word;
+        }
+
+        /* 行动按钮区域 */
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            justify-content: center;
+            padding: 10px 20px 25px;
+        }
+        .rpg-btn {
+            background: #2e3b2f;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 60px;
+            font-weight: bold;
+            color: #f7ecc7;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.1s linear;
+            box-shadow: 0 6px 0 #121a10;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .rpg-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 3px 0 #121a10;
+        }
+        .btn-primary {
+            background: #7a5230;
+            color: #fff0cf;
+            box-shadow: 0 6px 0 #4a2e18;
+        }
+        .btn-danger {
+            background: #8b3c3c;
+            box-shadow: 0 6px 0 #541e1e;
+        }
+        .btn-special {
+            background: #2f5b6e;
+            box-shadow: 0 6px 0 #1c3b48;
+        }
+        .level-up {
+            background: #c98f2e;
+            color: #1f2a0e;
+        }
+        footer {
+            font-size: 0.65rem;
+            text-align: center;
+            color: #7f8c6d;
+            background: #051016;
+            padding: 10px;
+        }
+        @media (max-width: 550px) {
+            .rpg-btn { padding: 6px 14px; font-size: 0.8rem;}
+            .stat-name { font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="rpg-container">
+    <div class="hero-title">
+        <h1>⚔️ 微光传说 ⚔️</h1>
+        <p>· 冒险者，你将书写命运史诗 ·</p>
+    </div>
+
+    <div class="status-panel">
+        <div class="hero-stats">
+            <div class="stat-name">
+                🧙 流浪勇者 <span>Lv.<span id="playerLv">1</span></span>
+            </div>
+            <div class="hp-bar"><div class="hp-fill" id="hpFill" style="width: 100%"></div></div>
+            <div class="stat-row">
+                <span>❤️ HP <span id="hpCurr">80</span>/<span id="hpMax">80</span></span>
+                <span>⚔️ 攻击力 <span id="atkVal">15</span></span>
+                <span>🛡️ 防御 <span id="defVal">6</span></span>
+            </div>
+            <div class="exp-bar"><div class="exp-fill" id="expFill" style="width: 0%"></div></div>
+            <div class="stat-row">
+                <span>✨ 经验值 <span id="expCurr">0</span>/<span id="expNext">100</span></span>
+                <span>💀 击败强敌 <span id="killCount">0</span></span>
+            </div>
+        </div>
+        <div class="combat-zone">
+            <h4>🏆 战意值</h4>
+            <div id="combatPower">💪 蓄势待发</div>
+            <div style="font-size: 0.7rem; margin-top:6px;">⚡ 每次战斗提升战力</div>
+        </div>
+    </div>
+
+    <div class="log-area" id="logPanel">
+        <div class="log-line">✨ 欢迎来到迷雾森林，冒险者。</div>
+        <div class="log-line">🗡️ 击败怪物可获得经验 & 宝藏！</div>
+        <div class="log-line">🌟 每一次战斗，你都将变得更强大——</div>
+    </div>
+
+    <div class="action-buttons">
+        <button class="rpg-btn btn-primary" id="exploreBtn">🌲 探索森林</button>
+        <button class="rpg-btn btn-danger" id="restBtn">🔥 篝火休息</button>
+        <button class="rpg-btn btn-special" id="adventureBtn">⭐ 神秘冒险</button>
+        <button class="rpg-btn" id="resetBtn">🔄 重启传奇</button>
+    </div>
+    <footer>⚡ 击败怪物 → 升级变强 → 挑战更强之敌 | 小心狂兽！</footer>
+</div>
+
+<script>
+    // ---------- RPG 核心数据结构 ----------
+    let hero = {
+        lv: 1,
+        hp: 80,
+        maxHp: 80,
+        baseAtk: 15,
+        baseDef: 6,
+        exp: 0,
+        expToNext: 100,
+        killCount: 0,
+        combatBonus: 0      // 战意加成 (随击杀永久上升)
+    };
+
+    // 游戏标志 (防止死亡后继续操作)
+    let gameOver = false;
+
+    // 获取DOM元素
+    const el = {
+        lv: document.getElementById('playerLv'),
+        hpCurr: document.getElementById('hpCurr'),
+        hpMax: document.getElementById('hpMax'),
+        atkVal: document.getElementById('atkVal'),
+        defVal: document.getElementById('defVal'),
+        expCurr: document.getElementById('expCurr'),
+        expNext: document.getElementById('expNext'),
+        killCount: document.getElementById('killCount'),
+        hpFill: document.getElementById('hpFill'),
+        expFill: document.getElementById('expFill'),
+        combatPower: document.getElementById('combatPower'),
+        logPanel: document.getElementById('logPanel')
+    };
+
+    // 辅助函数: 更新所有UI
+    function updateUI() {
+        // 限制血量不溢出
+        hero.hp = Math.min(hero.maxHp, Math.max(0, hero.hp));
+        el.hpCurr.textContent = Math.floor(hero.hp);
+        el.hpMax.textContent = hero.maxHp;
+        el.lv.textContent = hero.lv;
+        el.atkVal.textContent = getTotalAtk();
+        el.defVal.textContent = getTotalDef();
+        el.expCurr.textContent = hero.exp;
+        el.expNext.textContent = hero.expToNext;
+        el.killCount.textContent = hero.killCount;
+
+        // 血条百分比
+        let hpPercent = (hero.hp / hero.maxHp) * 100;
+        el.hpFill.style.width = `${hpPercent}%`;
+        let expPercent = (hero.exp / hero.expToNext) * 100;
+        el.expFill.style.width = `${expPercent}%`;
+
+        // 战意特效文字
+        let combatBonusPercent = hero.combatBonus;
+        if (combatBonusPercent > 0) {
+            el.combatPower.innerHTML = `🔥 战意 +${combatBonusPercent}% 伤害`;
+        } else {
+            el.combatPower.innerHTML = `⚔️ 初出茅庐`;
+        }
+        if (gameOver) {
+            el.combatPower.innerHTML = `💀 魂灵漂泊 · 请重启征程`;
+        }
+    }
+
+    // 总攻击 = 基础攻击 + 等级加成 + 战意加成
+    function getTotalAtk() {
+        let lvBonus = Math.floor(hero.lv * 2.5);
+        let combatBonusVal = Math.floor(hero.baseAtk * (hero.combatBonus / 100));
+        return hero.baseAtk + lvBonus + combatBonusVal;
+    }
+
+    function getTotalDef() {
+        let lvDefBonus = Math.floor(hero.lv * 1.2);
+        return hero.baseDef + lvDefBonus;
+    }
+
+    // 添加日志消息
+    function addLog(msg, isError = false) {
+        const logDiv = document.createElement('div');
+        logDiv.className = 'log-line';
+        logDiv.style.color = isError ? '#f8a5a5' : '#dcd0a5';
+        logDiv.innerHTML = isError ? `⚠️ ${msg}` : `✨ ${msg}`;
+        el.logPanel.appendChild(logDiv);
+        // 自动滚动到底部
+        el.logPanel.scrollTop = el.logPanel.scrollHeight;
+        // 保留最多25条日志避免过卡
+        while (el.logPanel.children.length > 28) {
+            el.logPanel.removeChild(el.logPanel.firstChild);
+        }
+    }
+
+    // 经验升级系统
+    function tryLevelUp() {
+        let leveled = false;
+        while (hero.exp >= hero.expToNext) {
+            hero.exp -= hero.expToNext;
+            hero.lv++;
+            // 升级加成
+            let hpGain = 15 + Math.floor(Math.random() * 12);
+            hero.maxHp += hpGain;
+            hero.hp = hero.maxHp;        // 升级满血
+            hero.baseAtk += 3;
+            hero.baseDef += 2;
+            // 下一级所需经验递增
+            hero.expToNext = Math.floor(hero.expToNext * 1.25);
+            if (hero.expToNext > 600) hero.expToNext = 600;
+            leveled = true;
+            addLog(`🎉 恭喜进阶 Lv.${hero.lv}！ 生命上限 +${hpGain}，攻击力提升！`, false);
+        }
+        if (leveled) {
+            addLog(`🌟 新境界加持！生命已恢复，战意更浓！`, false);
+            updateUI();
+        }
+    }
+
+    // 获得经验与战意
+    function gainExp(amount, isBoss = false) {
+        hero.exp += amount;
+        let combatRise = Math.floor(amount / 8) + (isBoss ? 2 : 0);
+        if (combatRise > 0) {
+            hero.combatBonus = Math.min(hero.combatBonus + combatRise, 85); // 上限85%加成
+            addLog(`💢 战意涌动！伤害加成 +${combatRise}% (总加成 ${hero.combatBonus}%)`, false);
+        }
+        updateUI();
+        tryLevelUp();
+        updateUI();
+    }
+
+    // 怪物随机系统 (名字/强度动态)
+    function generateMonster() {
+        const tier = Math.floor(Math.random() * Math.min(4, Math.floor(hero.lv / 2) + 2)) + 1;
+        const baseHp = 18 + tier * 6 + Math.floor(Math.random() * 15);
+        const baseAtk = 8 + tier * 3 + Math.floor(Math.random() * 8);
+        const baseDef = 3 + tier * 1.5;
+        let nameList = ['🦇 洞穴蝙蝠', '🐺 影狼', '🌿 荆棘怪', '🧟 腐烂僵尸', '🔥 火焰精灵', '⚡ 雷光兽', '🍄 蘑菇巨人', '🕷️ 暗影蜘蛛'];
+        if (tier >= 3) nameList = ['🐉 幼年亚龙', '👹 牛头卫士', '🧝 堕落游侠', '💀 骸骨骑士', '🌙 梦魇兽'];
+        if (tier >= 4) nameList = ['⚔️ 暗黑骑士', '🐉 熔岩龙裔', '👑 强盗头目'];
+        let name = nameList[Math.floor(Math.random() * nameList.length)];
+        return {
+            name: name,
+            hp: baseHp,
+            maxHp: baseHp,
+            atk: baseAtk,
+            def: baseDef,
+            expReward: 24 + tier * 8 + Math.floor(Math.random() * 18),
+            tier: tier
+        };
+    }
+
+    // 战斗结算模拟 (带有RPG风格的回合描述)
+    function fightMonster(monster) {
+        if (gameOver) {
+            addLog("💀 勇者已陨落，请重启传奇...", true);
+            return false;
+        }
+        let playerTotalAtk = getTotalAtk();
+        let playerDef = getTotalDef();
+        let monsterAtk = monster.atk;
+        let monsterDef = monster.def;
+        
+        // 简化回合制：玩家与怪物交替攻击 (动态演绎)
+        let playerCurrHp = hero.hp;
+        let monsterCurrHp = monster.hp;
+        
+        // 先攻判定 (根据敏捷模拟，这里随机附加)
+        let firstStrike = Math.random() > 0.45 ? "player" : "monster";
+        let roundLog = [];
+        roundLog.push(`⚔️ 遭遇 ${monster.name} (❤️${monster.maxHp} | ⚔️${monster.atk})`);
+        
+        let turn = 0;
+        let maxTurns = 30;
+        while (playerCurrHp > 0 && monsterCurrHp > 0 && turn < maxTurns) {
+            if (firstStrike === "player" || turn > 0) {
+                // 玩家攻击回合
+                let damage = Math.max(1, playerTotalAtk - Math.floor(monsterDef * 0.7) + Math.floor(Math.random() * 6));
+                monsterCurrHp -= damage;
+                roundLog.push(`🗡️ 你对 ${monster.name} 造成 ${damage} 伤害！ (剩余 ${Math.max(0, monsterCurrHp)})`);
+                if (monsterCurrHp <= 0) break;
+                // 怪物反击
+                let mobDamage = Math.max(1, monsterAtk - Math.floor(playerDef * 0.6) + Math.floor(Math.random() * 8));
+                playerCurrHp -= mobDamage;
+                roundLog.push(`💥 ${monster.name} 攻击造成 ${mobDamage} 伤害！ (勇者剩余 ${Math.max(0, playerCurrHp)})`);
+                if (playerCurrHp <= 0) break;
+            } else {
+                // 怪物先手
+                let mobDamage = Math.max(1, monsterAtk - Math.floor(playerDef * 0.6) + Math.floor(Math.random() * 8));
+                playerCurrHp -= mobDamage;
+                roundLog.push(`🌑 ${monster.name} 突袭造成 ${mobDamage} 伤害！ (勇者剩余 ${Math.max(0, playerCurrHp)})`);
+                if (playerCurrHp <= 0) break;
+                let damage = Math.max(1, playerTotalAtk - Math.floor(monsterDef * 0.7) + Math.floor(Math.random() * 6));
+                monsterCurrHp -= damage;
+                roundLog.push(`⚡ 你反击造成 ${damage} 伤害！ (怪物剩余 ${Math.max(0, monsterCurrHp)})`);
+                if (monsterCurrHp <= 0) break;
+            }
+            turn++;
+        }
+        
+        // 战斗结果
+        if (playerCurrHp <= 0) {
+            // 角色死亡
+            gameOver = true;
+            hero.hp = 0;
+            updateUI();
+            roundLog.push(`💔 战死沙场... ${monster.name} 击倒了勇者。 游戏终结`);
+            for (let log of roundLog) addLog(log, true);
+            addLog(`🏁 冒险终结 | 点击「重启传奇」继续征程`, true);
+            return false;
+        } else {
+            // 胜利
+            hero.hp = playerCurrHp;
+            hero.killCount += 1;
+            let finalExp = monster.expReward + (monster.tier * 2);
+            gainExp(finalExp, monster.tier >= 3);
+            updateUI();
+            roundLog.push(`🏆 胜利！击败 ${monster.name} 获得 ${finalExp} 经验！`);
+            // 额外掉落小彩蛋
+            let extraGoldLuck = Math.random();
+            if (extraGoldLuck > 0.85) {
+                let healBonus = Math.floor(Math.random() * 14) + 5;
+                hero.hp = Math.min(hero.maxHp, hero.hp + healBonus);
+                roundLog.push(`🍁 战斗后拾取生命药草，恢复了 ${healBonus} HP！`);
+                updateUI();
+            }
+            if (monster.tier >= 3) {
+                roundLog.push(`✨ 传说气息弥漫，战意大幅度提升！`);
+            }
+            for (let log of roundLog) addLog(log, false);
+            return true;
+        }
+    }
+
+    // 探索森林 (遭遇随机怪物)
+    function exploreAction() {
+        if (gameOver) {
+            addLog("英雄早已倒下，请重启冒险吧。", true);
+            return;
+        }
+        if (hero.hp <= 0) {
+            gameOver = true;
+            addLog("你已经力竭而亡……无法探索。", true);
+            return;
+        }
+        let monster = generateMonster();
+        addLog(`🌲 深入迷雾森林，你遇到了 ${monster.name} (等级强度 ${monster.tier})！`, false);
+        fightMonster(monster);
+        if (hero.hp <= 0) gameOver = true;
+        updateUI();
+    }
+
+    // 篝火休息 (回复血量)
+    function restAction() {
+        if (gameOver) {
+            addLog("魂灵无法安息…… 请重启传奇。", true);
+            return;
+        }
+        let missing = hero.maxHp - hero.hp;
+        if (missing <= 0) {
+            addLog("你已精力充沛，暂不需要休息。", false);
+            return;
+        }
+        let recover = Math.floor(hero.maxHp * 0.45) + 8;
+        hero.hp = Math.min(hero.maxHp, hero.hp + recover);
+        updateUI();
+        addLog(`🔥 篝火温暖了身躯，恢复了 ${recover} 生命值。 (HP: ${hero.hp}/${hero.maxHp})`, false);
+        // 偶尔小事件: 篝火旁遇动物朋友?
+        if (Math.random() < 0.2) {
+            addLog(`🦊 一只小灵狐蹭了蹭你，感觉心中充满希望 (+2 战意成长)`, false);
+            hero.combatBonus = Math.min(hero.combatBonus + 2, 85);
+            updateUI();
+        }
+    }
+
+    // 神秘冒险 (高风险高回报事件)
+    function mysticAdventure() {
+        if (gameOver) {
+            addLog("灵魂破碎，无法经历冒险。", true);
+            return;
+        }
+        if (hero.hp <= 5) {
+            addLog("伤势过重，你不敢贸然冒险……先休息吧。", true);
+            return;
+        }
+        let dice = Math.random();
+        if (dice < 0.5) {
+            // 遇敌强敌
+            let bossMonster = generateMonster();
+            bossMonster.tier = Math.min(5, bossMonster.tier + 1);
+            bossMonster.name = "⭐ " + bossMonster.name + "·远古魂";
+            bossMonster.hp += 12;
+            bossMonster.atk += 5;
+            addLog(`🌠 古老遗迹传来咆哮！遭遇强化 ${bossMonster.name}`, true);
+            fightMonster(bossMonster);
+        } else if (dice < 0.8) {
+            // 宝藏
+            let expGain = 35 + Math.floor(Math.random() * 40);
+            let cure = 30 + Math.floor(Math.random() * 30);
+            hero.hp = Math.min(hero.maxHp, hero.hp + cure);
+            gainExp(expGain, false);
+            addLog(`📦 发现神秘宝箱！获得 ${expGain} 经验，并恢复 ${cure} 生命！`, false);
+            updateUI();
+        } else {
+            // 神秘祝福
+            let bonus = 5 + Math.floor(Math.random() * 15);
+            hero.combatBonus = Math.min(hero.combatBonus + bonus, 85);
+            hero.hp = Math.min(hero.maxHp, hero.hp + 12);
+            addLog(`🌈 秘境女神给予祝福：战意永久 +${bonus}%！`, false);
+            updateUI();
+        }
+        if (hero.hp <= 0) gameOver = true;
+        updateUI();
+    }
+
+    // 重置游戏
+    function resetGame() {
+        gameOver = false;
+        hero = {
+            lv: 1,
+            hp: 80,
+            maxHp: 80,
+            baseAtk: 15,
+            baseDef: 6,
+            exp: 0,
+            expToNext: 100,
+            killCount: 0,
+            combatBonus: 0
+        };
+        updateUI();
+        // 清空日志但保留欢迎消息
+        while (el.logPanel.firstChild) {
+            el.logPanel.removeChild(el.logPanel.firstChild);
+        }
+        addLog("✨ 时光逆转——传奇再临！", false);
+        addLog("🗡️ 再次踏上冒险，这次你将书写更辉煌的诗篇。", false);
+        addLog("🏕️ 探索森林、篝火休憩，或寻神秘奇遇。", false);
+        updateUI();
+    }
+
+    // 绑定事件 && 启动
+    document.getElementById('exploreBtn').addEventListener('click', exploreAction);
+    document.getElementById('restBtn').addEventListener('click', restAction);
+    document.getElementById('adventureBtn').addEventListener('click', mysticAdventure);
+    document.getElementById('resetBtn').addEventListener('click', resetGame);
+    
+    // 初始更新UI
+    updateUI();
+    addLog("✨ 点击「探索森林」开始第一场试炼！", false);
+    addLog("⚔️ 战斗策略：击败越多怪物，战意越强，等级越高！", false);
+</script>
+</body>
+</html>

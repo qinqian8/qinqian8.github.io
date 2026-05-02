@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>RPG Final Fix</title>
+    <style>
+        body { background: #222; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; }
+        canvas { border: 2px solid #fff; background: #000; cursor: pointer; }
+        .controls { margin-top: 15px; display: grid; grid-template-columns: 60px 60px 60px; gap: 5px; }
+        .controls button { width: 60px; height: 60px; font-size: 20px; font-weight: bold; cursor: pointer; background: #444; color: white; border: 1px solid #777; border-radius: 5px; }
+        .controls button:active { background: #ff4d4d; }
+        .btn-up { grid-column: 2; }
+    </style>
+</head>
+<body>
+    <h3>2D Adventure (Final Fix)</h3>
+    <canvas id="gameCanvas" width="400" height="300"></canvas>
+
+    <div class="controls">
+        <button class="btn-up" onmousedown="move('up')" onmouseup="stop()" ontouchstart="move('up')" ontouchend="stop()">↑</button>
+        <button onmousedown="move('left')" onmouseup="stop()" ontouchstart="move('left')" ontouchend="stop()">←</button>
+        <button onmousedown="move('down')" onmouseup="stop()" ontouchstart="move('down')" ontouchend="stop()">↓</button>
+        <button onmousedown="move('right')" onmouseup="stop()" ontouchstart="move('right')" ontouchend="stop()">→</button>
+    </div>
+    <p>Keyboard: WASD or Arrows | Mouse: Click Buttons</p>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const player = { x: 50, y: 50, size: 20, speed: 5 };
+let activeMove = null;
+
+// Track keyboard state
+const keys = {};
+window.onkeydown = (e) => {
+    keys[e.key.toLowerCase()] = true;
+    if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(e.key.toLowerCase())) e.preventDefault();
+};
+window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+
+// Button control functions
+function move(dir) { activeMove = dir; }
+function stop() { activeMove = null; }
+
+function update() {
+    // Keyboard logic
+    if (keys['w'] || keys['arrowup'] || activeMove === 'up') player.y -= player.speed;
+    if (keys['s'] || keys['arrowdown'] || activeMove === 'down') player.y += player.speed;
+    if (keys['a'] || keys['arrowleft'] || activeMove === 'left') player.x -= player.speed;
+    if (keys['d'] || keys['arrowright'] || activeMove === 'right') player.x += player.speed;
+
+    // Boundary check
+    if (player.x < 0) player.x = 0;
+    if (player.y < 0) player.y = 0;
+    if (player.x > canvas.width - player.size) player.x = canvas.width - player.size;
+    if (player.y > canvas.height - player.size) player.y = canvas.height - player.size;
+}
+
+function draw() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw grid
+    ctx.strokeStyle = "#333";
+    for(let i=0; i<canvas.width; i+=40) {
+        ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke();
+    }
+
+    // Draw Player
+    ctx.fillStyle = "#00ffcc";
+    ctx.fillRect(player.x, player.y, player.size, player.size);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

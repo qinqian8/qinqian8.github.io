@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>极简网页RPG冒险</title>
+    <style>
+        body { background-color: #222; color: #eee; font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px; }
+        #game-container { width: 500px; background: #333; padding: 20px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        #stats { display: flex; justify-content: space-between; margin-bottom: 20px; padding: 10px; background: #444; border-radius: 5px; }
+        #log { height: 200px; overflow-y: auto; background: #111; padding: 10px; margin-bottom: 20px; border: 1px solid #555; font-size: 14px; line-height: 1.6; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { padding: 10px; cursor: pointer; background: #555; color: white; border: none; border-radius: 5px; transition: 0.2s; }
+        button:hover { background: #777; }
+        button:disabled { background: #222; color: #555; cursor: not-allowed; }
+        .health { color: #ff4d4d; }
+        .gold { color: #ffd700; }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="stats">
+        <div>等级: <span id="lvl">1</span></div>
+        <div>血量: <span id="hp" class="health">100</span>/100</div>
+        <div>金币: <span id="gold" class="gold">0</span></div>
+    </div>
+
+    <div id="log">欢迎来到地牢冒险！点击“探索”开始你的旅程。</div>
+
+    <div class="controls">
+        <button id="btn-explore" onclick="explore()">🌲 探索丛林</button>
+        <button id="btn-rest" onclick="rest()">💤 休息 (需10金币)</button>
+        <button id="btn-shop" onclick="upgrade()">⚔️ 升级武器 (需50金币)</button>
+        <button id="btn-reset" onclick="resetGame()" style="background:#8b0000;">🔄 重置游戏</button>
+    </div>
+</div>
+
+<script>
+    // 游戏状态
+    let player = {
+        lvl: 1,
+        hp: 100,
+        maxHp: 100,
+        atk: 10,
+        gold: 0
+    };
+
+    const logEl = document.getElementById('log');
+
+    function updateUI() {
+        document.getElementById('hp').innerText = player.hp;
+        document.getElementById('lvl').innerText = player.lvl;
+        document.getElementById('gold').innerText = player.gold;
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function addLog(msg, color = "#eee") {
+        logEl.innerHTML += `<div style="color:${color}">${msg}</div>`;
+        updateUI();
+    }
+
+    function explore() {
+        let event = Math.random();
+        
+        if (event < 0.6) { // 遇到怪物
+            const monsterHp = 20 + (player.lvl * 10);
+            const monsterAtk = 5 + (player.lvl * 2);
+            const loot = 10 + (player.lvl * 5);
+            
+            addLog(`⚔️ 遇到了一只怪物！攻击力:${monsterAtk}`, "#ffa500");
+            
+            // 简单战斗逻辑计算
+            player.hp -= monsterAtk;
+            if (player.hp <= 0) {
+                player.hp = 0;
+                addLog("💀 你战败了！勇士请重新来过。", "#ff0000");
+                disableActions(true);
+            } else {
+                player.gold += loot;
+                player.lvl += 1;
+                addLog(`✅ 你击败了怪物！获得 ${loot} 金币，等级提升！`, "#00ff00");
+            }
+        } else if (event < 0.9) { // 捡到钱
+            let found = Math.floor(Math.random() * 20) + 5;
+            player.gold += found;
+            addLog(`💰 你在草丛里捡到了 ${found} 枚金币！`, "#ffd700");
+        } else { // 空手而归
+            addLog("🍃 这里什么也没有发生。");
+        }
+    }
+
+    function rest() {
+        if (player.gold >= 10) {
+            player.gold -= 10;
+            player.hp = player.maxHp;
+            addLog("🍺 你在酒馆大喝一顿，血量恢复满了！", "#00bfff");
+        } else {
+            addLog("❌ 金币不足，无法休息！");
+        }
+    }
+
+    function upgrade() {
+        if (player.gold >= 50) {
+            player.gold -= 50;
+            player.atk += 5;
+            player.maxHp += 20;
+            addLog("⚔️ 武器升级了！你的攻击力和体力得到了提升。", "#da70d6");
+        } else {
+            addLog("❌ 金币不足，无法升级！");
+        }
+    }
+
+    function disableActions(disabled) {
+        document.getElementById('btn-explore').disabled = disabled;
+        document.getElementById('btn-rest').disabled = disabled;
+        document.getElementById('btn-shop').disabled = disabled;
+    }
+
+    function resetGame() {
+        player = { lvl: 1, hp: 100, maxHp: 100, atk: 10, gold: 0 };
+        logEl.innerHTML = "冒险重新开始！";
+        disableActions(false);
+        updateUI();
+    }
+</script>
+
+</body>
+</html>

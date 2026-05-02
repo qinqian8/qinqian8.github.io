@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>极简20行·躲避陨石</title><style>body{background:#0a0f1e;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}canvas{background:#0b1120;border-radius:16px;box-shadow:0 20px 35px black;}</style></head>
+<body>
+<canvas id="g" width="400" height="500"></canvas>
+<script>/*20行小游戏——躲开红色陨石，得分越高越刺激！*/
+const c=document.getElementById("g"),ctx=c.getContext("2d"),W=400,H=500;
+let shipX=W/2,score=0,rocks=[],frame=0;c.onmousemove=e=>{let r=c.getBoundingClientRect();shipX=Math.min(W-30,Math.max(0,e.clientX-r.left-15));};
+function game(){frame++;if(frame%30===0)rocks.push({x:Math.random()*(W-20),y:0});ctx.fillStyle="#0b1120",ctx.fillRect(0,0,W,H);
+ctx.fillStyle="#2ee6d8",ctx.fillRect(shipX,H-38,30,30);for(let i=0;i<rocks.length;i++){let r=rocks[i];r.y+=6;
+ctx.fillStyle="#ff3a5e",ctx.fillRect(r.x,r.y,20,20);if(r.y+20>H-38&&r.x+20>shipX&&r.x<shipX+30){alert("得分: "+score);location.reload();}
+if(r.y>H)rocks.splice(i,1),i--,score++;}ctx.fillStyle="#f5f9ff",ctx.font="bold 20px monospace",ctx.fillText("🔥 "+score,16,42);
+requestAnimationFrame(game);}game();
+</script>
+</body>
+</html>
