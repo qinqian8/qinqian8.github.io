@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>黑客帝国风格 - 动态终端模拟</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none; /* 避免选中文字，更像终端效果 */
+        }
+
+        body {
+            background: #000000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'Fira Code', monospace;
+            overflow: hidden;
+        }
+
+        /* 主容器含有 CRT 扫描线特效 */
+        .hacker-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: #0c0f0c;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,255,0,0.2);
+        }
+
+        /* 画布：字符雨核心层 */
+        #matrixCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 1;
+            opacity: 0.85;
+        }
+
+        /* 终端信息层 (滚动日志、扫描输出) */
+        .terminal-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            z-index: 2;
+            background: rgba(0, 10, 0, 0.75);
+            backdrop-filter: blur(3px);
+            border-left: 4px solid #0f0;
+            border-radius: 8px;
+            padding: 14px 18px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #2eff7a;
+            text-shadow: 0 0 3px #00cc44;
+            font-family: 'Courier New', monospace;
+            pointer-events: none;  /* 让点击穿透，不影响雨效果感受 */
+            box-shadow: 0 0 12px rgba(0,255,0,0.3);
+        }
+
+        .log-header {
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px dashed #2eff7a;
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        .log-content {
+            height: 130px;
+            overflow-y: hidden;
+            font-size: 13px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-weight: 500;
+        }
+
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 255, 0, 0.4);
+            box-shadow: 0 0 12px #0f0;
+            animation: scanMove 6s linear infinite;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        @keyframes scanMove {
+            0% { top: -10px; opacity: 0.6; }
+            20% { opacity: 1; }
+            80% { opacity: 0.8; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        /* 闪烁光标效果 */
+        .cursor-blink {
+            display: inline-block;
+            width: 10px;
+            background-color: #0f0;
+            box-shadow: 0 0 4px #0f0;
+            margin-left: 4px;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* 小字说明（极简） */
+        .watermark {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            z-index: 4;
+            color: #1f8a2c;
+            font-size: 10px;
+            font-family: monospace;
+            background: rgba(0,0,0,0.5);
+            padding: 2px 6px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+<div class="hacker-container">
+    <canvas id="matrixCanvas"></canvas>
+    <div class="terminal-overlay">
+        <div class="log-header">
+            <span>🔒 ROOT@CYBERPUNK:~$</span>
+            <span>⚡ 入侵协议 v2.3.7</span>
+            <span>🛸 匿名隧道已激活</span>
+        </div>
+        <div class="log-content" id="logMessages">
+            <span style="color:#9bff9b;">> 初始化内核模块... [OK]</span><br>
+            <span style="color:#9bff9b;">> 旁路防火墙规则... [ESTABLISHED]</span><br>
+            <span style="color:#9bff9b;">> 注入动态载荷...</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; display: flex; gap: 15px;">
+            <span>[ 目标IP: 127.0.0.1 (LOCALHOST) ]</span>
+            <span>[ 加密: AES-256-GCM ]</span>
+            <span id="fakeProgress">[ 渗透进度: 47% ]</span>
+        </div>
+    </div>
+    <div class="scan-line"></div>
+    <div class="watermark">⚠️ 仅视觉效果演示 | 无真实攻击行为</div>
+</div>
+
+<script>
+    (function(){
+        // ---------- 1. 字符雨（矩阵数字雨效果）--------
+        const canvas = document.getElementById('matrixCanvas');
+        let ctx = canvas.getContext('2d');
+        
+        // 调整画布尺寸（全屏适应）
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        
+        // 字符集: 黑客世界常见符号 (数字、字母、特殊字符)
+        const chars = "01アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+{}[]:;<>?,.~`";
+        const charArray = chars.split('');
+        
+        // 列宽: 每个字符大小 (像素)
+        const fontSize = 18;
+        let columns;
+        let drops = [];   // 存储每一列的当前y坐标
+        
+        function initMatrix() {
+            columns = Math.floor(width / fontSize);
+            drops = [];
+            for(let i = 0; i < columns; i++) {
+                // 随机初始化每个列的开始位置 (负值表示还未出现或逐渐下落)
+                drops[i] = Math.random() * -100;
+            }
+        }
+        
+        // 绘制字符雨
+        function drawMatrix() {
+            // 半透明黑色拖尾，制造渐变消失的经典效果
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, width, height);
+            
+            ctx.font = `${fontSize}px 'Courier New', monospace`;
+            ctx.shadowBlur = 0;
+            
+            for(let i = 0; i < drops.length; i++) {
+                // 随机取字符
+                const randomChar = charArray[Math.floor(Math.random() * charArray.length)];
+                // 亮度不同的绿色: 主要使用#0f0 和 #5f0等混合
+                const greenVal = 80 + Math.floor(Math.random() * 175);
+                const brightness = `rgb(30, ${greenVal + 30}, 20)`;
+                ctx.fillStyle = brightness;
+                
+                const x = i * fontSize;
+                const y = drops[i] * fontSize;
+                if(y > 0 && y < height) {
+                    ctx.fillText(randomChar, x, y);
+                }
+                
+                // 随机增加降雨亮度: 偶尔某些字符更亮 (模拟高亮)
+                if(Math.random() > 0.975) {
+                    ctx.fillStyle = '#eaffaa';
+                    ctx.fillText(randomChar, x, y);
+                }
+                
+                // 下落速度动态 (使得速度变化更随机)
+                drops[i] += 0.2 + Math.random() * 0.35;
+                
+                // 重置条件: 超出屏幕底部，且随机概率重置到顶部
+                if(drops[i] * fontSize > height && Math.random() > 0.98) {
+                    drops[i] = 0;
+                }
+                // 偶尔给一点点顶部重置的小概率
+                if(drops[i] * fontSize > height + 30 && Math.random() > 0.98){
+                    drops[i] = -Math.random() * 40;
+                }
+            }
+        }
+        
+        // ---------- 2. 模拟黑客终端滚动日志（动态生成恐怖/炫酷执行记录）--------
+        const logContainer = document.getElementById('logMessages');
+        const fakeProgressSpan = document.getElementById('fakeProgress');
+        
+        // 模拟信息队列 (动态刷新)
+        let messageQueue = [
+            "> 扫描开放端口: 22(SSH), 80(HTTP), 443(HTTPS), 8080(Proxy)...",
+            "> 检测到防火墙规则: ip_tables 已绕过",
+            "> 提取系统指纹: Linux 5.15.0-91-generic",
+            "> 破解Shadow哈希: 已获取 4/12 条记录",
+            "> 提权尝试 (CVE-2023-35001)  ... 成功",
+            "> 注入后门进程: [PID 2736] 隐藏中",
+            "> 建立C2信道: wss://anonym.darknet:443/control",
+            "> 转储敏感文件: /etc/passwd, /home/user/.bash_history",
+            "> 横向移动 -> 内网主机 192.168.1.107 探测中",
+            "> 内核rootkit 部署完毕",
+            "> 禁用selinux状态: 已绕过",
+            "> 日志清理器已运行 (无痕迹模式)",
+            "> 持久化注册: 创建 systemd 服务 'sysupdate'",
+            "> 抓取屏幕截图: 已保存到加密卷",
+            "> 数据泄露模拟: 512KB 传出 ...",
+            "> 关闭审计服务 auditd ... 完成",
+            "> 所有任务完成，隐藏会话保持..."
+        ];
+        
+        let logIndex = 0;
+        let intervalLog;
+        
+        // 添加新日志行 (保留最新30条)
+        function addLogMessage(msg) {
+            const newLine = document.createElement('div');
+            newLine.style.color = '#b3ffb3';
+            newLine.style.marginBottom = '3px';
+            newLine.style.fontFamily = 'monospace';
+            newLine.innerHTML = `> ${msg}`;
+            logContainer.appendChild(newLine);
+            // 自动滚动到底部
+            logContainer.scrollTop = logContainer.scrollHeight;
+            // 保持最多显示约28条，删除最早
+            while(logContainer.children.length > 28) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+        
+        // 模拟攻击进度条递增效果
+        let progressValue = 47;
+        function updateProgress() {
+            if(progressValue < 99) {
+                // 随机递增速率，像真正的扫描
+                let inc = Math.floor(Math.random() * 5) + 1;
+                progressValue = Math.min(progressValue + inc, 99);
+                fakeProgressSpan.innerHTML = `[ 渗透进度: ${progressValue}% ]`;
+                if(progressValue === 99) {
+                    setTimeout(() => {
+                        fakeProgressSpan.innerHTML = `[ ✔️ 后门激活 | 会话维持 ]`;
+                    }, 400);
+                }
+            } else {
+                // 维持最终状态偶尔闪烁
+                if(Math.random() > 0.97) {
+                    fakeProgressSpan.innerHTML = `[ 目标完全控制 | 数据渗漏中 ]`;
+                }
+            }
+        }
+        
+        // 周期性吐出黑客风格日志，同时更新进度
+        function startHackerLog() {
+            // 每2~3.5秒增加一条新消息
+            intervalLog = setInterval(() => {
+                if(logIndex < messageQueue.length) {
+                    addLogMessage(messageQueue[logIndex]);
+                    logIndex++;
+                    // 进度和日志联动
+                    updateProgress();
+                } else {
+                    // 循环一些新鲜的随机入侵指令
+                    const extraCmds = [
+                        "执行远程 shell 命令: whoami; id; uname -a",
+                        "下载额外工具: cobaltstrike beacon",
+                        "嗅探局域网 ARP 表 ...",
+                        "禁用系统恢复选项",
+                        "创建加密隧道到C2服务器",
+                        "转储lsass内存 (凭证提取模拟)",
+                        "注册表持久化: HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                        "检测杀软: 绕过Windows Defender",
+                        "清除所有事件日志 (wevtutil cl)",
+                        "获取管理员令牌 伪造进程",
+                        "横向移动: psexec 传输至 WORKSTATION-01"
+                    ];
+                    const randomCmd = extraCmds[Math.floor(Math.random() * extraCmds.length)];
+                    addLogMessage(randomCmd);
+                    if(progressValue < 97) updateProgress();
+                    else if(progressValue >= 97 && Math.random() > 0.7) {
+                        fakeProgressSpan.innerHTML = `[ 🔓 域控完全失陷 | 提权完成 ]`;
+                    }
+                }
+                // 当进度到99后，制造额外特殊效果
+                if(progressValue >= 95 && Math.random() > 0.85) {
+                    addLogMessage("⚠️ 内核态钩子安装中...");
+                }
+            }, 2300);
+        }
+        
+        // 增加一些随机的"root shell"提示闪烁效果 (控制台动态显示)
+        function addRandomGlitch() {
+            setInterval(() => {
+                if(Math.random() > 0.85) {
+                    const glitchText = document.createElement('div');
+                    glitchText.style.color = '#20ff30';
+                    glitchText.style.opacity = '0.8';
+                    glitchText.innerText = `> 检测到外部扫描: 127.0.0.1:${Math.floor(Math.random()*65535)} → 已混淆`;
+                    logContainer.appendChild(glitchText);
+                    if(logContainer.children.length > 32) logContainer.removeChild(logContainer.children[0]);
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }
+            }, 4900);
+        }
+        
+        // 3. 模拟快速字符闪烁 + "黑客命令" 动态横幅效果(可选,在页面上方动态浮动文字)
+        const createFloatingCmd = () => {
+            const cmdDiv = document.createElement('div');
+            cmdDiv.style.position = 'absolute';
+            cmdDiv.style.top = Math.random() * 60 + 20 + 'px';
+            cmdDiv.style.left = Math.random() * 70 + 10 + '%';
+            cmdDiv.style.color = `#0f0`;
+            cmdDiv.style.fontSize = '13px';
+            cmdDiv.style.fontFamily = 'monospace';
+            cmdDiv.style.zIndex = '5';
+            cmdDiv.style.background = 'rgba(0,20,0,0.6)';
+            cmdDiv.style.padding = '3px 10px';
+            cmdDiv.style.borderRadius = '20px';
+            cmdDiv.style.whiteSpace = 'nowrap';
+            cmdDiv.style.pointerEvents = 'none';
+            cmdDiv.style.backdropFilter = 'blur(2px)';
+            const commands = [
+                "sudo rm -rf /* --no-preserve-root (模拟演示无恶意)", 
+                "hydra -l root -P pass.txt ssh://target",
+                "msfvenom -p linux/x64/meterpreter/reverse_tcp",
+                "nc -lvp 4444 -e /bin/bash",
+                "sqlmap -u http://test.com?id=1 --dbs",
+                "ettercap -T -M arp:remote //",
+                "nmap -sV -p- -T4 10.0.2.15",
+                "curl ifconfig.me ; echo 隧道激活",
+                "python3 -c 'import pty; pty.spawn(\"/bin/bash\")'",
+                "cat /etc/shadow | grep root"
+            ];
+            const randomCmd = commands[Math.floor(Math.random() * commands.length)];
+            cmdDiv.innerText = `$ ${randomCmd}`;
+            document.querySelector('.hacker-container').appendChild(cmdDiv);
+            setTimeout(() => {
+                cmdDiv.style.opacity = '0';
+                setTimeout(() => cmdDiv.remove(), 800);
+            }, 2800);
+        };
+        
+        // 让漂浮命令行每隔一段时间出现
+        let floatInterval;
+        
+        // ---------- 4. 全屏自适应处理 + 循环动画 ----------
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            initMatrix();
+        }
+        
+        // 动画循环
+        function animateMatrix() {
+            drawMatrix();
+            requestAnimationFrame(animateMatrix);
+        }
+        
+        // 启动所有视觉效果
+        function bootHackerUI() {
+            resizeCanvas();
+            animateMatrix();
+            startHackerLog();
+            addRandomGlitch();
+            // 每隔7~15秒出现浮动命令行
+            floatInterval = setInterval(() => {
+                if(Math.random() > 0.5) createFloatingCmd();
+            }, 7000);
+        }
+        
+        // 监听窗口尺寸变化重新初始化画布
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+        
+        // 额外增加一个模拟终端头的动态命令闪烁 (光标)
+        const headerSpan = document.querySelector('.log-header span:first-child');
+        setInterval(() => {
+            if(headerSpan && Math.random() > 0.75) {
+                const oldText = headerSpan.innerHTML;
+                headerSpan.innerHTML = oldText.includes('ROOT') ? '🔓 GUEST@CYBERPUNK:~$' : '🔒 ROOT@CYBERPUNK:~$';
+                setTimeout(() => {
+                    headerSpan.innerHTML = '🔒 ROOT@CYBERPUNK:~$';
+                }, 600);
+            }
+        }, 5000);
+        
+        // 模拟端口扫描进度条的额外微小变化 (显示字节数字)
+        setInterval(() => {
+            const extraInfo = document.querySelector('.terminal-overlay div:last-child span:first-child');
+            if(extraInfo && Math.random() > 0.85) {
+                const ipvariant = `[ 目标IP: 10.0.2.${Math.floor(Math.random()*255)} (隧道节点) ]`;
+                const targetSpan = document.querySelector('.terminal-overlay > div:last-child span:first-child');
+                if(targetSpan) targetSpan.innerHTML = ipvariant;
+                setTimeout(() => {
+                    if(targetSpan) targetSpan.innerHTML = '[ 目标IP: 127.0.0.1 (LOCALHOST) ]';
+                }, 4000);
+            }
+        }, 8000);
+    
+        // 预设添加一个有趣效果: 在控制台输出模拟警告（浏览器控制台，无伤大雅）
+        console.log("%c⚠️ 警告: 本页面仅为视觉效果，不包含任何恶意代码！模拟黑客风格仅供娱乐。", "color: #0f0; font-size: 14px; font-family: monospace;");
+        console.log("%c>>> 矩阵雨 + 动态渗透日志 | 完全前端模拟 <<<", "color: #2eff7a");
+        
+        // 开始执行！
+        bootHackerUI();
+    })();
+</script>
+</body>
+</html>
