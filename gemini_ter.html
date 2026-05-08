@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tetris Pro Max - 竞技版</title>
+    <style>
+        body { background: #1a1a2e; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #ui-wrapper { display: flex; gap: 20px; padding: 20px; background: #16213e; border-radius: 15px; box-shadow: 0 0 50px rgba(0,0,0,0.8); border: 2px solid #0f3460; position: relative; }
+        canvas { border: 2px solid #4ecca3; background: #000; box-shadow: 0 0 15px rgba(78, 204, 163, 0.3); }
+        .sidebar { display: flex; flex-direction: column; width: 120px; gap: 10px; }
+        .info-box { background: #0f3460; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #1a1a2e; }
+        .label { font-size: 11px; color: #4ecca3; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 22px; font-weight: bold; font-family: monospace; }
+        #nextCanvas { background: #000; border: 1px solid #4ecca3; margin-top: 5px; border-radius: 4px; }
+        button { background: #e94560; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        button:hover { background: #ff4d6d; transform: scale(1.05); }
+        .controls-hint { font-size: 11px; color: #666; line-height: 1.4; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="ui-wrapper">
+    <canvas id="tetris" width="240" height="480"></canvas>
+    
+    <div class="sidebar">
+        <div class="info-box">
+            <div class="label">Score</div>
+            <div id="score" class="value">0</div>
+        </div>
+        <div class="info-box">
+            <div class="label">Level</div>
+            <div id="level" class="value">1</div>
+        </div>
+        <div class="info-box">
+            <div class="label">Next</div>
+            <canvas id="nextCanvas" width="80" height="80"></canvas>
+        </div>
+        
+        <button onclick="resetGame()">RESTART</button>
+
+        <div class="controls-hint">
+            ↑: 旋转<br>
+            ← →: 移动<br>
+            ↓: 软降<br>
+            Space: 硬降
+        </div>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById('tetris');
+const context = canvas.getContext('2d');
+const nextCanvas = document.getElementById('nextCanvas');
+const nCtx = nextCanvas.getContext('2d');
+
+context.scale(24, 24);
+nCtx.scale(20, 20);
+
+// --- 核心配置 ---
+const COLORS = [null, '#00f0f0', '#0000f0', '#f0a000', '#f0f000', '#00f000', '#a000f0', '#f00000'];
+
+class PieceGenerator {
+    constructor() { this.bag = []; }
+    generate() {
+        if (this.bag.length === 0) {
+            this.bag = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+            for (let i = this.bag.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+            }
+        }
+        return this.bag.pop();
+    }
+}
+
+const generator = new PieceGenerator();
+const arena = Array.from({length: 20}, () => Array(10).fill(0));
+const player = { pos: {x: 0, y: 0}, matrix: null, next: null, score: 0, level: 1, lines: 0 };
+
+function createPiece(type) {
+    const p = {
+        'I': [[0,1,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]],
+        'J': [[0,2,0],[0,2,0],[2,2,0]],
+        'L': [[0,3,0],[0,3,0],[0,3,3]],
+        'O': [[4,4],[4,4]],
+        'S': [[0,5,5],[5,5,0],[0,0,0]],
+        'T': [[0,6,0],[6,6,6],[0,0,0]],
+        'Z': [[7,7,0],[0,7,7],[0,0,0]]
+    };
+    return p[type];
+}
+
+// --- 逻辑函数 ---
+function collide(arena, player) {
+    const [m, o] = [player.matrix, player.pos];
+    for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < m[y].length; ++x) {
+            if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) return true;
+        }
+    }
+    return false;
+}
+
+function merge(arena, player) {
+    player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) arena[y + player.pos.y][x + player.pos.x] = value;
+        });
+    });
+}
+
+function rotate(matrix) {
+    for (let y = 0; y < matrix.length; ++y) {
+        for (let x = 0; x < y; ++x) [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+    }
+    matrix.forEach(row => row.reverse());
+}
+
+function arenaSweep() {
+    let rowCount = 0;
+    outer: for (let y = arena.length - 1; y > 0; --y) {
+        if (!arena[y].includes(0)) {
+            const row = arena.splice(y, 1)[0].fill(0);
+            arena.unshift(row);
+            ++y;
+            rowCount++;
+        }
+    }
+    if (rowCount > 0) {
+        player.score += (rowCount * 100) * player.level;
+        player.lines += rowCount;
+        if (player.lines >= player.level * 10) {
+            player.level++;
+            dropInterval = Math.max(100, 800 - (player.level - 1) * 100);
+        }
+        updateScoreUI();
+    }
+}
+
+function updateScoreUI() {
+    document.getElementById('score').innerText = player.score;
+    document.getElementById('level').innerText = player.level;
+}
+
+function playerReset() {
+    if (!player.next) player.next = generator.generate();
+    player.matrix = createPiece(player.next);
+    player.next = generator.generate();
+    player.pos.y = 0;
+    player.pos.x = (arena[0].length / 2 | 0) - (player.matrix[0].length / 2 | 0);
+    
+    if (collide(arena, player)) {
+        // 游戏结束
+        alert("GAME OVER! Score: " + player.score);
+        resetGame();
+    }
+    drawNext();
+}
+
+// 硬降逻辑
+function hardDrop() {
+    while (!collide(arena, player)) {
+        player.pos.y++;
+    }
+    player.pos.y--;
+    merge(arena, player);
+    arenaSweep();
+    playerReset();
+    dropCounter = 0;
+}
+
+function resetGame() {
+    arena.forEach(row => row.fill(0));
+    player.score = 0;
+    player.level = 1;
+    player.lines = 0;
+    dropInterval = 800;
+    player.next = null;
+    updateScoreUI();
+    playerReset();
+}
+
+// --- 绘制函数 ---
+function drawMatrix(matrix, offset, ctx) {
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                ctx.fillStyle = COLORS[value];
+                ctx.fillRect(x + offset.x, y + offset.y, 1, 1);
+                ctx.lineWidth = 0.05;
+                ctx.strokeStyle = '#fff';
+                ctx.strokeRect(x + offset.x, y + offset.y, 1, 1);
+            }
+        });
+    });
+}
+
+function drawNext() {
+    nCtx.fillStyle = '#000';
+    nCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+    const nextM = createPiece(player.next);
+    drawMatrix(nextM, {x: 1, y: 1}, nCtx);
+}
+
+let dropCounter = 0;
+let dropInterval = 800;
+let lastTime = 0;
+
+function update(time = 0) {
+    const deltaTime = time - lastTime;
+    lastTime = time;
+    dropCounter += deltaTime;
+    
+    if (dropCounter > dropInterval) {
+        playerDrop();
+    }
+
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    drawMatrix(arena, {x: 0, y: 0}, context);
+    drawMatrix(player.matrix, player.pos, context);
+    requestAnimationFrame(update);
+}
+
+function playerDrop() {
+    player.pos.y++;
+    if (collide(arena, player)) {
+        player.pos.y--;
+        merge(arena, player);
+        arenaSweep();
+        playerReset();
+    }
+    dropCounter = 0;
+}
+
+// --- 控制器 ---
+document.addEventListener('keydown', e => {
+    if (e.keyCode === 37) { // 左
+        player.pos.x--;
+        if (collide(arena, player)) player.pos.x++;
+    } else if (e.keyCode === 39) { // 右
+        player.pos.x++;
+        if (collide(arena, player)) player.pos.x--;
+    } else if (e.keyCode === 40) { // 下 (软降)
+        playerDrop();
+    } else if (e.keyCode === 38) { // 上 (旋转)
+        const oldX = player.pos.x;
+        rotate(player.matrix);
+        let offset = 1;
+        while (collide(arena, player)) {
+            player.pos.x += offset;
+            offset = -(offset + (offset > 0 ? 1 : -1));
+            if (offset > player.matrix[0].length) {
+                rotate(player.matrix); rotate(player.matrix); rotate(player.matrix);
+                player.pos.x = oldX;
+                return;
+            }
+        }
+    } else if (e.keyCode === 32) { // 空格 (硬降)
+        e.preventDefault();
+        hardDrop();
+    }
+});
+
+playerReset();
+update();
+</script>
+</body>
+</html>
